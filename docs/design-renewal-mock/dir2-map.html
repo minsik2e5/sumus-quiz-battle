@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>시안 2 · 모험 지도형</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+/* ===== 시안 2 토큰 ===== */
+.phone{
+  --ink:#2d2a3e; --paper:#fff4dc; --card:#fffdf7; --sand:#ecd6a6; --sub:#75675b;
+  --mint:#27c995; --mint-d:#12936a; --sky:#4dbcff; --sky-d:#1f86cf; --tang:#ff9b2f; --tang-d:#d26f0d;
+  --berry:#ff6079; --berry-d:#cf3352; --lav:#a487ff; --lav-d:#6f4fd6; --lemon:#ffd84a;
+  --fs1:12px; --fs2:14px; --fs3:17px; --fs4:21px; --fs5:28px; --fs6:40px;
+  --r1:14px; --r2:22px; --bd:2.5px;
+  font-family:Pretendard,sans-serif;font-weight:600;font-size:var(--fs2);color:var(--ink);background:var(--paper);
+}
+.j{font-family:Jua,Pretendard,sans-serif;font-weight:400}
+/* 스티커: 납작한 색 + 먹색 테두리 + 아래로 밀린 단 */
+.st{background:var(--c,var(--card));border:var(--bd) solid var(--ink);border-radius:var(--r2);box-shadow:0 4px 0 var(--ink)}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;height:56px;padding:0 18px;border-radius:var(--r2);border:var(--bd) solid var(--ink);background:var(--c,var(--tang));box-shadow:0 5px 0 var(--ink);
+  font-family:Jua,sans-serif;font-size:var(--fs4);color:var(--ink);transition:transform .08s,box-shadow .08s}
+.btn:active{transform:translateY(5px);box-shadow:0 0 0 var(--ink)}
+.btn.sm{height:46px;font-size:var(--fs3);border-radius:16px;box-shadow:0 4px 0 var(--ink)}
+.btn.paper{--c:var(--card)} .btn.mint{--c:var(--mint)} .btn.berry{--c:var(--berry);color:#fff}
+.tag{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 12px 0 6px;border-radius:999px;background:var(--card);border:var(--bd) solid var(--ink);font-size:var(--fs2);font-weight:800}
+.tag img{width:22px;height:22px}
+.dot{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:var(--ink);color:#fff;font-size:var(--fs1);font-weight:700}
+.top{position:absolute;left:14px;right:14px;top:16px;display:flex;align-items:center;gap:8px;z-index:3}
+.top .sp{flex:1}
+.top h1{font-size:var(--fs5);line-height:1}
+.x{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--card);border:var(--bd) solid var(--ink);box-shadow:0 3px 0 var(--ink);font-size:20px;font-weight:800;transition:transform .08s}
+.x:active{transform:translateY(3px)}
+
+.tabs{position:absolute;left:0;right:0;bottom:0;height:80px;padding:8px 8px 14px;background:var(--card);border-top:var(--bd) solid var(--ink);display:grid;grid-template-columns:repeat(5,1fr)}
+.tab{display:grid;justify-items:center;align-content:center;gap:2px;font-size:var(--fs1);font-weight:700;color:var(--sub);transition:transform .08s}
+.tab:active{transform:scale(.92)}
+.tab i{display:grid;place-items:center;width:46px;height:38px;border-radius:14px;border:var(--bd) solid transparent}
+.tab img{width:34px;height:34px}
+.tab.on{color:var(--ink);font-weight:800}
+.tab.on i{background:var(--lemon);border-color:var(--ink);box-shadow:0 3px 0 var(--ink);transform:translateY(-3px)}
+
+/* 지도: 길 + 정거장 */
+.map{position:absolute;inset:0;z-index:0}
+.map svg{position:absolute;inset:0;width:100%;height:100%}
+.blob{position:absolute;border-radius:50%;background:#ffe9b8}
+.blob.g{background:#d9f3c9}
+.node{position:absolute;display:grid;place-items:center;width:var(--s,72px);height:var(--s,72px);margin:calc(var(--s,72px)/-2) 0 0 calc(var(--s,72px)/-2);border-radius:50%;background:var(--c,var(--sky));border:var(--bd) solid var(--ink);box-shadow:0 6px 0 var(--cd,var(--sky-d)),0 6px 0 var(--bd) var(--ink);transition:transform .08s,box-shadow .08s;z-index:2}
+.node:active{transform:translateY(6px);box-shadow:0 0 0 var(--cd),0 0 0 var(--bd) var(--ink)}
+.node img{width:62%;height:62%}
+.node.done{--c:var(--mint);--cd:var(--mint-d)}
+.node.done::after{content:"";width:22px;height:11px;border:solid #fff;border-width:0 0 5px 5px;transform:rotate(-45deg) translate(2px,-3px)}
+.node.later{--c:#f3e6c8;--cd:#d6c193}
+.node.later img{opacity:.55}
+.lab{position:absolute;z-index:2;font-size:var(--fs2);line-height:1.25;font-weight:800}
+.lab small{display:block;font-size:var(--fs1);color:var(--sub);font-weight:600}
+.lab.j{font-size:var(--fs4)}
+.bub{position:absolute;z-index:4;padding:8px 14px;border-radius:16px;background:var(--card);border:var(--bd) solid var(--ink);font-family:Jua,sans-serif;font-size:var(--fs3)}
+.bub::after{content:"";position:absolute;left:var(--tx,24px);bottom:-8px;width:12px;height:12px;background:var(--card);border:solid var(--ink);border-width:0 var(--bd) var(--bd) 0;transform:rotate(45deg)}
+
+/* ===== 홈 ===== */
+.unit{position:absolute;left:14px;right:14px;top:66px;display:flex;align-items:center;gap:10px;padding:10px 14px;--c:var(--mint);z-index:3}
+.unit p{flex:1;font-size:var(--fs4);line-height:1.1}
+.unit small{display:block;font:700 12px Pretendard;margin-top:4px;opacity:.8}
+.unit .pips{display:flex;gap:4px}
+.unit .pips i{width:14px;height:14px;border-radius:50%;border:2px solid var(--ink);background:var(--card)}
+.unit .pips i.f{background:var(--lemon)}
+.home .pet{position:absolute;left:14px;top:196px;width:150px;height:150px;z-index:3}
+.home .start{position:absolute;left:14px;right:14px;top:692px;z-index:3}
+
+/* ===== 학습 ===== */
+.stones{position:absolute;left:66px;right:14px;top:30px;display:flex;align-items:center;gap:3px}
+.stones i{flex:1;height:10px;border-radius:5px;background:var(--sand)}
+.stones i.f{background:var(--mint);border:2px solid var(--ink);height:12px}
+.stones i.c{flex:0 0 18px;height:18px;border-radius:50%;background:var(--tang);border:var(--bd) solid var(--ink)}
+.study .cnt{position:absolute;right:16px;top:62px;font-size:var(--fs2);font-weight:800;color:var(--sub)}
+.study .pet{position:absolute;left:8px;top:96px;width:112px;height:112px;z-index:2}
+.study .ask{position:absolute;left:116px;top:112px;--tx:-9px}
+.study .ask::after{left:-8px;bottom:14px;border-width:0 0 var(--bd) var(--bd)}
+.qcard{position:absolute;left:16px;right:16px;top:214px;padding:20px 18px 24px;text-align:center}
+.qcard .word{font-size:52px;line-height:1.15;letter-spacing:-.01em}
+.qcard .snd{margin:10px auto 0;height:36px;padding:0 14px;border-radius:999px;background:var(--sky);border:var(--bd) solid var(--ink);font-size:var(--fs2);font-weight:800;display:flex;align-items:center;gap:6px}
+.qcard .snd::before{content:"";border:6px solid transparent;border-left:9px solid var(--ink);margin-right:-4px}
+.field{position:absolute;left:16px;right:16px;top:392px;height:60px;display:flex;align-items:center;padding:0 16px;border-radius:var(--r2);background:#fff;border:var(--bd) dashed var(--ink);font-size:var(--fs3);color:#a3978a}
+.field i{width:3px;height:26px;background:var(--tang);border-radius:2px;margin-right:8px}
+.study .acts{position:absolute;left:16px;right:16px;top:470px;display:grid;grid-template-columns:128px 1fr;gap:10px}
+.keys{position:absolute;left:0;right:0;bottom:0;height:138px;background:#f0e2c2;border-top:var(--bd) solid var(--ink);display:grid;place-items:center;color:#9a8b74;font-size:var(--fs1)}
+.fb{position:absolute;left:10px;right:10px;bottom:10px;z-index:5;padding:16px;--c:var(--mint);transform:translateY(120%);transition:transform .3s cubic-bezier(.2,.9,.3,1.15)}
+.fb h4{font-size:var(--fs5);line-height:1} .fb p{margin:4px 0 12px;font-size:var(--fs3);font-weight:800}
+.answered .fb{transform:none}
+
+/* ===== 야차전 ===== */
+.ytabs{position:absolute;left:14px;right:14px;top:70px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.ytabs button{height:40px;border-radius:14px;border:var(--bd) solid var(--ink);background:var(--card);font-family:Jua,sans-serif;font-size:var(--fs3)}
+.ytabs .on{background:var(--berry);color:#fff;box-shadow:0 3px 0 var(--ink);transform:translateY(-2px)}
+.duel{position:absolute;left:14px;right:14px;top:124px;height:132px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;justify-items:center}
+.duel .f{display:grid;justify-items:center;gap:6px;font-size:var(--fs2);font-weight:800}
+.duel .f i{display:grid;place-items:center;width:98px;height:98px;border-radius:50%;background:#d6efff;border:var(--bd) solid var(--ink);box-shadow:0 4px 0 var(--ink);overflow:hidden;font:400 52px Jua;color:var(--berry-d);font-style:normal}
+.duel .f.b i{background:#ffe0e5;border-style:dashed}
+.duel .f img{width:92px;height:92px}
+.duel b{font-size:44px;color:var(--berry)}
+.steps{position:absolute;left:14px;right:14px;top:268px;display:grid;gap:10px}
+.steps::before{content:"";position:absolute;left:15px;top:16px;bottom:16px;border-left:3px dashed var(--sand)}
+.step{position:relative;display:grid;grid-template-columns:32px 1fr;gap:10px;align-items:start}
+.step>b{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--lemon);border:var(--bd) solid var(--ink);font-family:Jua,sans-serif;font-size:var(--fs3);margin-top:6px}
+.step small{display:block;margin-top:5px;font-size:var(--fs1);color:var(--sub)}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px}
+.seg button,.pick{display:flex;align-items:center;justify-content:center;gap:5px;height:44px;border-radius:16px;background:var(--card);border:var(--bd) solid var(--ink);font-size:var(--fs3);font-weight:800;transition:transform .08s}
+.seg button:active{transform:translateY(2px)}
+.seg button img{width:26px;height:26px}
+.seg .on{background:var(--lemon);box-shadow:0 3px 0 var(--ink);transform:translateY(-2px)}
+.pick{justify-content:space-between;padding:0 14px;width:100%}
+.pick span{font-size:var(--fs1);color:var(--sub)}
+.yacha .acts{position:absolute;left:14px;right:14px;top:586px;display:grid;gap:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ===== 놀이터 ===== */
+.stall{position:absolute;z-index:2;display:grid;justify-items:center;transition:transform .08s}
+.stall:active{transform:scale(.95)}
+.stall img{width:var(--s,104px);height:var(--s,104px)}
+.stall span{margin-top:-6px;padding:6px 14px;border-radius:16px;background:var(--card);border:var(--bd) solid var(--ink);box-shadow:0 4px 0 var(--ink);font-family:Jua,sans-serif;font-size:var(--fs4);line-height:1.1;text-align:center}
+.stall small{display:block;font:700 12px Pretendard;color:var(--sub);margin-top:2px}
+.ticket{position:absolute;right:14px;top:150px;width:150px;padding:0;overflow:hidden;z-index:3;text-align:left;transform:rotate(3deg)}
+.ticket img{width:100%;height:74px;object-fit:cover;border-bottom:var(--bd) solid var(--ink)}
+.ticket p{padding:6px 10px 8px;font-size:var(--fs3);line-height:1.15}
+.ticket small{display:block;font:700 12px Pretendard;color:var(--berry-d)}
+.joinrow{position:absolute;left:14px;right:14px;top:696px;display:flex;align-items:center;gap:8px;padding:8px 8px 8px 14px;z-index:3;font-weight:800}
+.joinrow i{flex:1;height:38px;border-radius:12px;border:var(--bd) dashed var(--ink);display:flex;align-items:center;padding:0 10px;font-style:normal;font-weight:600;color:#a3978a;background:#fff}
+
+/* ===== 결과 ===== */
+.conf i{position:absolute;width:12px;height:12px;border-radius:3px;border:2px solid var(--ink)}
+.res h2{position:absolute;left:0;right:0;top:52px;text-align:center;font-size:var(--fs6);line-height:1.05}
+.res h2 small{display:block;font:800 14px Pretendard;color:var(--sub);margin-bottom:8px}
+.stamp{position:absolute;right:16px;top:128px;z-index:3;display:grid;place-items:center;width:92px;height:92px;border-radius:50%;border:4px solid var(--berry-d);color:var(--berry-d);font-family:Jua,sans-serif;font-size:26px;transform:rotate(14deg);background:rgba(255,255,255,.6);box-shadow:inset 0 0 0 4px rgba(255,255,255,.6),inset 0 0 0 6px var(--berry-d)}
+.res .pet{position:absolute;left:50%;top:150px;width:210px;height:210px;margin-left:-118px}
+.trail{position:absolute;left:30px;right:30px;top:372px;display:flex;align-items:center}
+.trail i{width:30px;height:30px;border-radius:50%;border:var(--bd) solid var(--ink);background:var(--card);flex:none}
+.trail i.f{background:var(--mint)} .trail i.c{background:var(--tang);width:38px;height:38px;box-shadow:0 3px 0 var(--ink)}
+.trail s{flex:1;border-top:3px dashed var(--sand)} .trail s.f{border-color:var(--mint-d)}
+.stats{position:absolute;left:14px;right:14px;top:430px;display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:8px}
+.stats div{padding:10px 6px 10px;text-align:center;font-size:var(--fs1);font-weight:700;color:var(--sub)}
+.stats b{display:block;font:400 34px/1 Jua;color:var(--ink)}
+.loot{position:absolute;left:14px;right:14px;top:536px;display:flex;align-items:center;gap:10px;padding:10px 12px;--c:#efe6ff}
+.loot>img{width:64px;height:64px}
+.loot p{flex:1;font-size:var(--fs3);line-height:1.2}
+.loot small{display:block;font:700 12px Pretendard;color:var(--sub)}
+.loot .tag{height:36px;font-size:var(--fs3)}
+.res .acts{position:absolute;left:14px;right:14px;bottom:26px;display:grid;gap:12px}
+</style>
+</head>
+<body>
+<div class="doc-head">
+  <a href="index.html">← 시안 목록</a>
+  <h1>시안 2 · 모험 지도형</h1>
+  <p>홈이 "오늘의 길"입니다. 펫이 길 위에 서 있고, 정거장(단어 → 복습 → 어법 → 야차전 → 보물)을 차례로 지납니다. 따뜻한 종이 바탕에 먹색 테두리 스티커 모양입니다. 놀이터는 가게가 늘어선 마을입니다.</p>
+  <button class="replay">들어오는 움직임 다시 보기</button>
+</div>
+
+<div class="scroll"><div class="stage">
+
+<!-- 1. 홈 -->
+<figure class="shot"><figcaption>홈 <small>오늘의 길</small></figcaption>
+<div class="phone home" data-screen="home">
+  <div class="map">
+    <i class="blob" style="left:-60px;top:330px;width:190px;height:190px"></i>
+    <i class="blob g" style="right:-70px;top:170px;width:210px;height:210px"></i>
+    <i class="blob g" style="left:-40px;top:560px;width:150px;height:150px"></i>
+    <i class="blob" style="right:-50px;top:520px;width:170px;height:170px"></i>
+    <svg viewBox="0 0 390 844" fill="none" stroke-linecap="round">
+      <path d="M96 176 C 220 176, 300 220, 262 286 S 96 330, 118 396 S 300 430, 270 500 S 100 540, 124 606" stroke="#ecd6a6" stroke-width="26"/>
+      <path d="M96 176 C 220 176, 300 220, 262 286" stroke="#27c995" stroke-width="26"/>
+      <path d="M96 176 C 220 176, 300 220, 262 286 S 96 330, 118 396 S 300 430, 270 500 S 100 540, 124 606" stroke="#2d2a3e" stroke-width="2.5" stroke-dasharray="2 12"/>
+    </svg>
+  </div>
+  <div class="top a-drop">
+    <span class="tag"><img src="../../public/assets/ui/streak.webp" alt="">7일</span>
+    <span class="tag"><img src="../../public/assets/ui/coin.webp" alt="">950</span>
+    <span class="sp"></span>
+    <span class="tag" style="padding-left:12px">출석 완료</span>
+  </div>
+  <section class="unit st a-up d1"><p class="j">오늘의 길<small>3과 · 4과 · 정거장 5곳 가운데 1곳 지남</small></p><span class="pips"><i class="f"></i><i></i><i></i><i></i><i></i></span></section>
+
+  <button class="node done a-pop d2" style="left:96px;top:176px;--s:56px"></button>
+  <span class="lab a-fade d3" style="left:132px;top:150px"><small>출석</small></span>
+
+  <button class="node a-pop d3" style="left:262px;top:286px;--s:92px;--c:var(--tang);--cd:var(--tang-d)"><img src="../../public/assets/ui/study-vocab.webp" alt=""></button>
+  <span class="lab j a-fade d4" style="left:214px;top:342px">단어 20개<small>지금 여기 · 약 6분</small></span>
+  <img class="pet a-pop d4" src="../../public/assets/pets/cat-1.webp" alt="내 펫 나비">
+  <div class="bub a-pop d6" style="left:122px;top:196px;--tx:14px">여기부터 가자!</div>
+
+  <button class="node later a-pop d4" style="left:118px;top:396px"><img src="../../public/assets/ui/flash-deck.webp" alt=""></button>
+  <span class="lab a-fade d5" style="left:164px;top:384px">복습 12개<small>어제 틀린 단어</small></span>
+
+  <button class="node later a-pop d5" style="left:270px;top:500px"><img src="../../public/assets/ui/nav-yacha.webp" alt=""></button>
+  <span class="lab a-fade d6" style="left:150px;top:488px;text-align:right">야차전 한 판<small>이기면 +10코인</small></span>
+
+  <button class="node later a-pop d6" style="left:124px;top:606px;--s:80px;--c:#e6dcff;--cd:#bba6f5"><img src="../../public/assets/ui/gift.webp" alt="" style="opacity:1"></button>
+  <span class="lab a-fade d7" style="left:176px;top:592px">오늘의 보물<small>다 지나면 +30코인</small></span>
+
+  <button class="btn start a-up d7">단어 20개 시작</button>
+  <nav class="tabs">
+    <button class="tab on"><i><img src="../../public/assets/ui/nav-home.webp" alt=""></i>홈</button>
+    <button class="tab"><i><img src="../../public/assets/ui/nav-study.webp" alt=""></i>학습</button>
+    <button class="tab"><i><img src="../../public/assets/ui/nav-yacha.webp" alt=""></i>야차전</button>
+    <button class="tab"><i><img src="../../public/assets/ui/nav-arcade.webp" alt=""></i>놀이터</button>
+    <button class="tab"><i><img src="../../public/assets/ui/nav-me.webp" alt=""></i>나</button>
+  </nav>
+</div></figure>
+
+<!-- 2. 학습 -->
+<figure class="shot"><figcaption>학습 <small>단어 연습 문제 · "확인"을 눌러 보세요</small></figcaption>
+<div class="phone study" data-screen="study">
+  <div class="top"><button class="x">×</button></div>
+  <div class="stones a-fade"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="c"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <span class="cnt">7 / 20 · 3연속 정답</span>
+  <img class="pet a-pop d1" src="../../public/assets/pets/cat-1.webp" alt="">
+  <div class="bub ask a-pop d3">이 단어, 뜻이 뭘까?</div>
+  <section class="qcard st a-up d2">
+    <span class="dot">뜻 직접 쓰기</span>
+    <p class="word j">extended</p>
+    <button class="snd">발음 듣기</button>
+  </section>
+  <div class="field a-up d3"><i></i>뜻을 입력하세요</div>
+  <div class="acts a-up d4"><button class="btn paper" style="font-size:17px">모르겠어요</button><button class="btn mint" data-check>확인</button></div>
+  <div class="keys">키보드 자리</div>
+  <div class="fb st"><h4 class="j">정답이에요!</h4><p>extended · 연장된, 늘어난</p><button class="btn paper" style="width:100%" data-check>다음 정거장으로</button></div>
+</div></figure>
+
+<!-- 3. 야차전 -->
+<figure class="shot"><figcaption>야차전 <small>대결 준비</small></figcaption>
+<div class="phone yacha" data-screen="yacha">
+  <div class="top a-drop"><h1 class="j">야차전</h1><span class="sp"></span>
+    <span class="tag"><img src="../../public/assets/ui/league-bronze-s.webp" alt="">브론즈 · 0승</span>
+    <span class="tag"><img src="../../public/assets/ui/coin.webp" alt="">950</span></div>
+  <div class="ytabs"><button class="on">대결</button><button>몬스터</button><button>던전</button><button>기록</button></div>
+  <div class="duel">
+    <div class="f a-pop d1"><i><img src="../../public/assets/pets/cat-1.webp" alt=""></i>나비 Lv.3</div>
+    <b class="j a-pop d3">VS</b>
+    <div class="f b a-pop d2"><i>?</i>누가 올까?</div>
+  </div>
+  <div class="steps">
+    <div class="step a-up d2"><b>1</b><div><div class="seg" data-seg><button class="on"><img src="../../public/assets/ui/mode-speed.webp" alt="">스피드</button><button><img src="../../public/assets/ui/mode-skill.webp" alt="">실력</button></div><small>2분 · 4지선다 · 빠를수록 세게 때려요</small></div></div>
+    <div class="step a-up d3"><b>2</b><div><button class="pick">단어 · 3과 · 4과<span>268단어 ›</span></button></div></div>
+    <div class="step a-up d4"><b>3</b><div><div class="seg" data-seg><button class="on">각자 내 범위</button><button>같은 범위</button></div></div></div>
+    <div class="step a-up d5"><b>4</b><div><div class="seg" data-seg><button class="on"><img src="../../public/assets/ui/coin.webp" alt="">10</button><button><img src="../../public/assets/ui/coin.webp" alt="">30</button><button><img src="../../public/assets/ui/coin.webp" alt="">50</button></div><small>이기면 +10 · 지면 −10</small></div></div>
+  </div>
+  <div class="acts a-up d6">
+    <button class="btn berry">친구에게 도전장</button>
+    <div class="two"><button class="btn paper sm">봇과 연습</button><button class="btn paper sm">방 번호로 입장</button></div>
+  </div>
+  <nav class="tabs">
+    <button class="tab"><i><img src="../../public/assets/ui/nav-home.webp" alt=""></i>홈</button>
+    <button class="tab"><i><img src="../../public/assets/ui/nav-study.webp" alt=""></i>학습</button>
+    <button class="tab on"><i><img src="../../public/assets/ui/nav-yacha.webp" alt=""></i>야차전</button>
+    <button class="tab"><i><img src="../../public/assets/ui/nav-arcade.webp" alt=""></i>놀이터</button>
+    <button class="tab"><i><img src="../../public/assets/ui/nav-me.webp" alt=""></i>나</button>
+  </nav>
+</div></figure>
+
+<!-- 4. 놀이터 -->
+<figure class="shot"><figcaption>놀이터 <small>놀이터 마을</small></figcaption>
+<div class="phone arc" data-screen="arcade">
+  <div class="map">
+    <i class="blob g" style="left:-70px;top:120px;width:230px;height:230px"></i>
+    <i class="blob" style="right:-60px;top:330px;width:200px;height:200px"></i>
+    <i class="blob g" style="left:-50px;top:520px;width:190px;height:190px"></i>
+    <svg viewBox="0 0 390 844" fill="none" stroke-linecap="round">
+      <path d="M92 250 C 200 300, 330 330, 290 420 S 60 470, 100 560 S 300 580, 290 640" stroke="#ecd6a6" stroke-width="26"/>
+      <path d="M92 250 C 200 300, 330 330, 290 420 S 60 470, 100 560 S 300 580, 290 640" stroke="#2d2a3e" stroke-width="2.5" stroke-dasharray="2 12"/>
+    </svg>
+  </div>
+  <div class="top a-drop"><h1 class="j">놀이터 마을</h1><span class="sp"></span>
+    <span class="tag" style="padding-left:12px">오늘 33판</span>
+    <span class="tag"><img src="../../public/assets/ui/coin.webp" alt="">950</span></div>
+  <button class="stall a-pop d1" style="left:22px;top:92px;--s:150px"><img src="../../public/assets/ui/arcade.webp" alt=""><span>미니게임<small>8가지 · 18판 남음</small></span></button>
+  <button class="ticket st a-pop d3"><img src="../../public/assets/runner/entry.webp" alt=""><p class="j"><small>새 게임 · 3판</small>펫 대행진</p></button>
+  <button class="stall a-pop d2" style="right:26px;top:316px;--s:112px"><img src="../../public/assets/yabawi/chips-stack.webp" alt=""><span>코인 승부<small>10판 남음</small></span></button>
+  <button class="stall a-pop d3" style="left:30px;top:424px;--s:124px"><img src="../../public/assets/ui/egg-shop.webp" alt=""><span>알 상점<small>뽑기 · 알</small></span></button>
+  <button class="stall a-pop d4" style="right:38px;top:540px;--s:100px"><img src="../../public/assets/ui/trophy.webp" alt=""><span>기록관</span></button>
+  <div class="joinrow st a-up d5">교실 게임<i>방 번호 4자리</i><button class="btn mint sm" style="height:38px;box-shadow:none">입장</button></div>
+  <nav class="tabs">
+    <button class="tab"><i><img src="../../public/assets/ui/nav-home.webp" alt=""></i>홈</button>
+    <button class="tab"><i><img src="../../public/assets/ui/nav-study.webp" alt=""></i>학습</button>
+    <button class="tab"><i><img src="../../public/assets/ui/nav-yacha.webp" alt=""></i>야차전</button>
+    <button class="tab on"><i><img src="../../public/assets/ui/nav-arcade.webp" alt=""></i>놀이터</button>
+    <button class="tab"><i><img src="../../public/assets/ui/nav-me.webp" alt=""></i>나</button>
+  </nav>
+</div></figure>
+
+<!-- 5. 결과 -->
+<figure class="shot"><figcaption>연습 결과 <small>정거장 통과</small></figcaption>
+<div class="phone res" data-screen="result">
+  <div class="conf a-fade">
+    <i style="left:30px;top:120px;background:var(--lemon);transform:rotate(20deg)"></i><i style="left:70px;top:230px;background:var(--sky);border-radius:50%"></i>
+    <i style="right:40px;top:260px;background:var(--mint);transform:rotate(40deg)"></i><i style="left:44px;top:330px;background:var(--berry)"></i>
+    <i style="right:76px;top:330px;background:var(--lav);border-radius:50%"></i><i style="right:150px;top:30px;background:var(--tang);transform:rotate(30deg)"></i>
+  </div>
+  <h2 class="j a-drop"><small>3과 · 4과 · 단어 20개</small>정거장 통과!</h2>
+  <img class="pet a-pop d2" src="../../public/assets/pets/cat-1-cheer.webp" alt="">
+  <div class="stamp a-pop d5">참 잘함</div>
+  <div class="trail a-fade d3"><i class="f"></i><s class="f"></s><i class="c"></i><s></s><i></i><s></s><i></i><s></s><i></i></div>
+  <div class="stats">
+    <div class="st a-up d4"><b><span data-count="85">85</span>점</b>20개 중 17개</div>
+    <div class="st a-up d5"><b>2:41</b>걸린 시간</div>
+    <div class="st a-up d6"><b>8일</b>연속 학습</div>
+  </div>
+  <section class="loot st a-up d7"><img src="../../public/assets/ui/gift.webp" alt=""><p class="j">받은 것</p>
+    <span class="tag"><img src="../../public/assets/ui/coin.webp" alt="">+24</span><span class="tag"><img src="../../public/assets/ui/xp.webp" alt="">+40</span></section>
+  <div class="acts a-up d8">
+    <button class="btn">다음 정거장 · 복습 12개</button>
+    <div class="two"><button class="btn paper sm">틀린 3개 다시</button><button class="btn paper sm">홈으로</button></div>
+  </div>
+</div></figure>
+
+</div></div>
+
+<div class="rules">
+  <section><h2>색 · 이름 붙인 14개</h2><table>
+    <tr><th><i class="sw" style="background:#2d2a3e"></i>먹색</th><td><code>#2d2a3e</code> 모든 테두리 · 글자</td></tr>
+    <tr><th><i class="sw" style="background:#fff4dc"></i>종이</th><td><code>#fff4dc</code> 화면 바탕</td></tr>
+    <tr><th><i class="sw" style="background:#fffdf7"></i>스티커 흰색</th><td><code>#fffdf7</code> 스티커 · 보조 버튼 · 탭 바</td></tr>
+    <tr><th><i class="sw" style="background:#ecd6a6"></i>모래</th><td><code>#ecd6a6</code> 길 · 아직 안 간 곳</td></tr>
+    <tr><th><i class="sw" style="background:#75675b"></i>흙색 글자</th><td><code>#75675b</code> 설명 글(종이 위 5.0:1)</td></tr>
+    <tr><th><i class="sw" style="background:#ff9b2f"></i>귤</th><td><code>#ff9b2f</code> 주 버튼 · "지금 여기". 화면에 하나</td></tr>
+    <tr><th><i class="sw" style="background:#27c995"></i>민트</th><td><code>#27c995</code> 지나온 길 · 정답</td></tr>
+    <tr><th><i class="sw" style="background:#ff6079"></i>딸기</th><td><code>#ff6079</code> 야차전 · 오답</td></tr>
+    <tr><th><i class="sw" style="background:#4dbcff"></i>하늘</th><td><code>#4dbcff</code> 소리 · 정보</td></tr>
+    <tr><th><i class="sw" style="background:#a487ff"></i>라벤더</th><td><code>#a487ff</code> 보물 · 희귀</td></tr>
+    <tr><th><i class="sw" style="background:#ffd84a"></i>레몬</th><td><code>#ffd84a</code> 고른 것(칩 · 탭 · 번호)</td></tr>
+    <tr><th>아래 단 3색</th><td>귤 <code>#d26f0d</code> · 민트 <code>#12936a</code> · 하늘 <code>#1f86cf</code> (정거장 버튼의 옆면)</td></tr>
+  </table></section>
+  <section><h2>글자</h2><table>
+    <tr><th>제목 · 버튼</th><td><b>Jua(주아)</b> (SIL OFL 1.1) · 이미 저장소에 있음(한글 368KB + 영문 17KB) → 새로 받는 무게 0</td></tr>
+    <tr><th>본문 · 숫자</th><td><b>Pretendard</b> 600 · 800 (SIL OFL 1.1) · 굵기 1개에 약 170KB</td></tr>
+    <tr><th>크기 6단계</th><td>12 · 14 · 17 · 21 · 28 · 40px (단어 문제만 52px)</td></tr>
+    <tr><th>굵기</th><td>본문 600, 강조 800. Jua는 굵기가 하나</td></tr>
+  </table></section>
+  <section><h2>모양</h2><table>
+    <tr><th>둥근 정도</th><td>14px(작은 칸) · 22px(스티커 · 버튼) · 동그라미(정거장 · 알약)</td></tr>
+    <tr><th>테두리</th><td>먹색 2.5px. 입력 칸과 "아직 없는 것"은 점선</td></tr>
+    <tr><th>버튼</th><td>납작한 색 + 아래로 5px 밀린 먹색 단. 누르면 5px 내려가 단이 사라짐. 정거장은 동그란 버튼(옆면 6px)</td></tr>
+    <tr><th>카드 대신</th><td>길과 정거장. 설명은 정거장 옆 글자로만. 스티커(패널)는 화면에 1~2장</td></tr>
+    <tr><th>칩</th><td>흰 알약 + 먹색 테두리(자원). 고른 것은 레몬색 + 2px 솟음</td></tr>
+    <tr><th>탭 바</th><td>흰 띠 + 위 테두리. 고른 탭은 레몬 스티커 위에 아이콘</td></tr>
+    <tr><th>아이콘</th><td>저장소의 3D 그림만. 이모지 금지, 영어 꼬리표 금지. 체크 · 화살표는 CSS 도형</td></tr>
+  </table></section>
+  <section><h2>움직임 · 무게</h2><ul>
+    <li>정거장이 길 순서대로 하나씩 통 튀어 나옵니다(0.46초, 0.06초 간격). 말풍선은 맨 뒤.</li>
+    <li>정답이면 아래에서 민트 스티커가 올라옵니다(0.3초).</li>
+    <li>길은 SVG 선 3개, 언덕은 CSS 동그라미입니다. 그림 파일을 새로 받지 않습니다.</li>
+    <li>blur · backdrop-filter · 끝없는 애니메이션 없음. <code>transform</code> · <code>opacity</code>만.</li>
+    <li>글꼴 무게: Jua는 이미 있음 + 본문 2굵기 340KB.</li>
+  </ul></section>
+</div>
+<script src="mock.js"></script>
+</body>
+</html>

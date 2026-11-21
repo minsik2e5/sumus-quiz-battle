@@ -1,0 +1,48 @@
+/* 디자인 리뉴얼 시안 공통: 글꼴 · 폰 틀 · 설명 표. 앱 번들에 들어가지 않는다(docs 전용). */
+@font-face{font-family:"Bagel Fat One";src:url(fonts/bagel-fat-one-kr.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"Pretendard";font-weight:100 900;src:url(fonts/pretendard-var-kr.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"Jua";src:url(../../public/assets/fonts/jua-korean.woff2) format("woff2");font-display:swap;unicode-range:U+1100-11FF,U+3130-318F,U+AC00-D7AF}
+@font-face{font-family:"Jua";src:url(../../public/assets/fonts/jua-latin.woff2) format("woff2");font-display:swap}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:Pretendard,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:#15161a;color:#f2f2f2;line-height:1.45;padding:28px 24px 60px}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+img{display:block;max-width:none}
+
+.doc-head{max-width:1100px;margin:0 0 22px}
+.doc-head a{color:#9fd;font-size:14px}
+.doc-head h1{font-size:28px;font-weight:800;margin:8px 0 6px;letter-spacing:-.02em}
+.doc-head p{font-size:15px;color:#c9c9cf;max-width:760px}
+.doc-head .replay{margin-top:12px;height:40px;padding:0 16px;border-radius:10px;background:#2b2d35;font-size:14px;font-weight:700}
+
+.stage{display:flex;gap:24px;width:max-content;padding:4px}
+.shot{width:390px}
+.shot>figcaption{font-size:15px;font-weight:700;color:#e8e8ee;margin:0 0 10px 4px}
+.shot>figcaption small{font-weight:500;color:#9a9aa5;margin-left:6px;font-size:13px}
+.scroll{overflow-x:auto;margin:0 -24px;padding:0 24px 12px}
+.phone{position:relative;width:390px;height:844px;overflow:hidden;border-radius:34px;isolation:isolate}
+
+.rules{max-width:1100px;margin:36px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
+.rules section{background:#1e2026;border-radius:14px;padding:16px 18px}
+.rules h2{font-size:17px;font-weight:800;margin-bottom:10px}
+.rules table{width:100%;border-collapse:collapse;font-size:13.5px}
+.rules td,.rules th{text-align:left;padding:6px 6px 6px 0;border-top:1px solid #30323a;vertical-align:top}
+.rules th{color:#9a9aa5;font-weight:600;white-space:nowrap;width:1%;padding-right:12px}
+.rules .sw{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:6px;box-shadow:0 0 0 1px rgba(255,255,255,.25)}
+.rules ul{padding-left:18px;font-size:13.5px}
+.rules li{margin:4px 0}
+.rules code{font-size:12.5px;color:#bfe}
+
+/* 화면 들어올 때 움직임: 한 번만 돌고 멈춘다(끝없는 애니메이션 없음). transform · opacity만 쓴다. */
+@keyframes in-up{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes in-pop{0%{opacity:0;transform:scale(.6)}70%{opacity:1;transform:scale(1.08)}100%{opacity:1;transform:none}}
+@keyframes in-drop{0%{opacity:0;transform:translateY(-40px)}70%{opacity:1;transform:translateY(6px)}100%{opacity:1;transform:none}}
+@keyframes in-fade{from{opacity:0}to{opacity:1}}
+.a-up{animation:in-up .42s cubic-bezier(.2,.8,.2,1) both}
+.a-pop{animation:in-pop .46s cubic-bezier(.2,.9,.3,1.2) both}
+.a-drop{animation:in-drop .5s cubic-bezier(.2,.8,.2,1) both}
+.a-fade{animation:in-fade .5s ease both}
+.d1{animation-delay:.06s}.d2{animation-delay:.12s}.d3{animation-delay:.18s}.d4{animation-delay:.24s}.d5{animation-delay:.3s}.d6{animation-delay:.36s}.d7{animation-delay:.42s}.d8{animation-delay:.5s}
+.still *{animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

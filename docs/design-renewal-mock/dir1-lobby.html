@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>시안 1 · 게임 로비형</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+/* ===== 시안 1 토큰 ===== */
+.phone{
+  --navy:#0f1b4d; --blue:#3f86ff; --blue-d:#2248cf; --sky:#a9d8ff;
+  --sun:#ffc928; --sun-d:#d68a00; --mint:#22d39b; --mint-d:#0b8f65;
+  --red:#ff5648; --red-d:#b9271d; --grape:#9160ff; --grape-d:#5a30c4;
+  --cloud:#eaf1ff; --white:#fff; --mute:#56628c;
+  --fs1:12px; --fs2:14px; --fs3:17px; --fs4:22px; --fs5:30px; --fs6:44px;
+  --r1:12px; --r2:18px; --ol:3px; --edge:5px;
+  font-family:Pretendard,sans-serif; color:var(--navy); font-weight:700; font-size:var(--fs2);
+  background:linear-gradient(#55a0ff,#2c58e2 62%,#2143bf);
+}
+.phone::before{content:"";position:absolute;inset:0;z-index:-1;background:repeating-linear-gradient(115deg,rgba(255,255,255,.055) 0 26px,transparent 26px 52px)}
+.dsp{font-family:"Bagel Fat One",Pretendard,sans-serif;font-weight:400;letter-spacing:.01em}
+/* 외곽선 글자: 흰 글자 + 남색 테두리 + 아래 그림자 */
+.ol{color:#fff;-webkit-text-stroke:var(--sw,5px) var(--navy);paint-order:stroke fill;text-shadow:0 3px 0 var(--navy)}
+.ol.sun{color:var(--sun)}
+/* 눌리는 버튼: 아래 두꺼운 테두리가 눌리면 사라진다 */
+.btn{position:relative;display:flex;align-items:center;justify-content:center;gap:8px;height:58px;padding:0 18px 5px;border-radius:var(--r2);border:var(--ol) solid var(--navy);
+  background:var(--c,var(--sun));box-shadow:inset 0 3px 0 rgba(255,255,255,.5),inset 0 calc(var(--edge)*-1) 0 var(--cd,var(--sun-d)),0 4px 0 var(--navy);
+  font-family:"Bagel Fat One",Pretendard,sans-serif;font-weight:400;font-size:var(--fs4);color:var(--navy);transition:transform .07s,box-shadow .07s}
+.btn:active{transform:translateY(4px);padding-bottom:1px;box-shadow:inset 0 3px 0 rgba(255,255,255,.5),inset 0 -1px 0 var(--cd,var(--sun-d)),0 0 0 var(--navy)}
+.btn.mint{--c:var(--mint);--cd:var(--mint-d)} .btn.red{--c:var(--red);--cd:var(--red-d);color:#fff} .btn.white{--c:#fff;--cd:#c3d0f2}
+.btn.sm{height:46px;font-size:var(--fs3);border-radius:14px;padding:0 12px 4px}
+.btn.red .lbl,.btn .lbl.w{color:#fff;-webkit-text-stroke:4px var(--navy);paint-order:stroke fill}
+/* 패널: 흰 색 블록 + 남색 테두리 + 아래 단 */
+.panel{background:#fff;border:var(--ol) solid var(--navy);border-radius:var(--r2);box-shadow:0 5px 0 rgba(15,27,77,.55)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px 0 4px;border-radius:999px;background:var(--navy);color:#fff;font-size:var(--fs2);font-weight:800;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)}
+.pill img{width:28px;height:28px}
+.chip{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:999px;background:var(--navy);color:#fff;font-size:var(--fs1);font-weight:800}
+.chip.sun{background:var(--sun);color:var(--navy)} .chip.mint{background:var(--mint);color:var(--navy)}
+
+/* 탭 바: 남색 띠 + 가운데가 솟은 홈 */
+.tabs{position:absolute;left:0;right:0;bottom:0;height:84px;background:var(--navy);display:grid;grid-template-columns:repeat(5,1fr);align-items:end;padding:0 6px 14px;border-top:3px solid #2a3c86}
+.tab{display:grid;justify-items:center;gap:1px;color:#b9c6f5;font-size:var(--fs1);font-weight:800;transition:transform .08s}
+.tab:active{transform:scale(.92)}
+.tab img{width:40px;height:40px}
+.tab.on{color:var(--sun)} .tab.on img{transform:translateY(-4px) scale(1.12)}
+.tab.home{position:relative;top:-6px}
+.tab.home i{display:grid;place-items:center;width:70px;height:70px;margin-top:-34px;border-radius:50%;background:var(--blue);border:var(--ol) solid var(--navy);box-shadow:inset 0 3px 0 rgba(255,255,255,.45),inset 0 -6px 0 var(--blue-d),0 4px 0 #060d2b}
+.tab.home.on i{background:var(--sun);box-shadow:inset 0 3px 0 rgba(255,255,255,.55),inset 0 -6px 0 var(--sun-d),0 4px 0 #060d2b}
+.tab.home img{width:46px;height:46px;transform:none!important}
+
+.top{position:absolute;left:14px;right:14px;top:16px;display:flex;align-items:center;gap:8px;z-index:3}
+.top .sp{flex:1}
+.sq{display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:#fff;border:var(--ol) solid var(--navy);box-shadow:inset 0 -4px 0 #c3d0f2,0 3px 0 var(--navy);font-size:20px;font-weight:900;transition:transform .07s}
+.sq:active{transform:translateY(3px)}
+
+/* ===== 홈(로비) ===== */
+.me{display:flex;align-items:center;gap:8px}
+.me .av{position:relative;width:46px;height:46px;border-radius:14px;background:#fff;border:var(--ol) solid var(--navy);overflow:visible}
+.me .av img{width:40px;height:40px}
+.me .av b{position:absolute;right:-8px;bottom:-8px;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--sun);border:2px solid var(--navy);font-size:12px;font-weight:900}
+.me p{font-size:var(--fs3);color:#fff;font-weight:900;line-height:1.1;text-shadow:0 2px 0 var(--navy)}
+.me small{display:block;font-size:var(--fs1);font-weight:700;color:#d8e6ff;text-shadow:none}
+.side{position:absolute;top:168px;display:grid;gap:12px;z-index:2}
+.side.l{left:14px} .side.r{right:14px}
+.side button{display:grid;justify-items:center;gap:2px;width:62px;font-size:var(--fs1);font-weight:800;color:#fff;text-shadow:0 2px 0 var(--navy);transition:transform .07s}
+.side button:active{transform:scale(.92)}
+.side i{position:relative;display:grid;place-items:center;width:58px;height:58px;border-radius:16px;background:rgba(15,27,77,.45);border:2px solid rgba(255,255,255,.35)}
+.side img{width:46px;height:46px}
+.side em{position:absolute;right:-6px;top:-6px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--red);border:2px solid var(--navy);color:#fff;font:900 11px/16px Pretendard;text-shadow:none}
+.hero{position:absolute;left:0;right:0;top:92px;height:418px;display:grid;justify-items:center;align-content:start}
+.hero h2{font-size:var(--fs6);line-height:1;--sw:7px;margin-top:6px}
+.hero .lv{display:flex;align-items:center;gap:6px;margin-top:10px}
+.xp{width:120px;height:14px;border-radius:7px;background:var(--navy);border:2px solid var(--navy);overflow:hidden}
+.xp s{display:block;height:100%;width:var(--v,40%);background:linear-gradient(var(--mint),var(--mint-d));border-radius:5px;box-shadow:inset 0 2px 0 rgba(255,255,255,.5);transform-origin:left;animation:grow .7s .3s cubic-bezier(.2,.8,.2,1) both}
+@keyframes grow{from{transform:scaleX(0)}}
+.hero .pet{width:262px;height:262px;margin-top:14px;position:relative;z-index:1}
+.podium{position:absolute;left:50%;bottom:8px;width:290px;height:74px;margin-left:-145px;border-radius:50%;background:radial-gradient(ellipse at 50% 35%,#8fc3ff 0 44%,#3b6df0 45% 62%,#1c3aa8 63%);border:var(--ol) solid var(--navy)}
+.say{position:absolute;left:14px;top:352px;z-index:2;padding:8px 12px;border-radius:14px;background:#fff;border:var(--ol) solid var(--navy);font-size:var(--fs2);font-weight:800}
+.say::after{content:"";position:absolute;right:18px;top:-9px;transform:rotate(225deg)!important;width:14px;height:14px;background:#fff;border:solid var(--navy);border-width:0 3px 3px 0;transform:rotate(45deg)}
+.quest{position:absolute;left:14px;right:14px;top:520px;padding:12px 12px 12px 14px}
+.quest header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.quest h3{font-size:var(--fs3)}
+.quest .slots{display:grid;grid-template-columns:1fr 1fr 1fr 58px;gap:8px;align-items:stretch}
+.q{padding:7px 8px;border-radius:var(--r1);background:var(--cloud);border:2px solid #c3d3ff;font-size:var(--fs1);line-height:1.25}
+.q b{display:block;font-size:var(--fs2);font-weight:900}
+.q.now{background:#fff6cf;border-color:var(--sun-d)}
+.q.done{background:#d8f8ea;border-color:var(--mint-d)}
+.chest{display:grid;place-items:center;border-radius:var(--r1);background:var(--grape);border:2px solid var(--navy);position:relative}
+.chest img{width:44px;height:44px}
+.chest b{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);white-space:nowrap}
+.go{position:absolute;left:14px;right:14px;top:646px;display:grid;grid-template-columns:118px 1fr;gap:10px}
+.go .range{display:grid;align-content:center;height:68px;padding:0 12px 4px;text-align:left;border-radius:var(--r2);background:#fff;border:var(--ol) solid var(--navy);box-shadow:inset 0 -5px 0 #c3d0f2,0 4px 0 var(--navy);font-size:var(--fs1);color:var(--mute);transition:transform .07s}
+.go .range:active{transform:translateY(4px)}
+.go .range b{font-size:var(--fs3);color:var(--navy);font-weight:900}
+.go .btn{height:68px;font-size:var(--fs5)}
+
+/* ===== 학습 ===== */
+.study{background:var(--cloud)} .study::before{display:none}
+.study .band{position:absolute;inset:0 0 auto;height:116px;background:linear-gradient(#55a0ff,#2c58e2);border-bottom:var(--ol) solid var(--navy)}
+.prog{flex:1;position:relative;height:26px;border-radius:13px;background:var(--navy);border:var(--ol) solid var(--navy);overflow:hidden}
+.prog s{display:block;height:100%;width:35%;border-radius:10px;background:var(--sun);box-shadow:inset 0 3px 0 rgba(255,255,255,.6),inset 0 -4px 0 var(--sun-d);transform-origin:left;animation:grow .6s .2s both}
+.prog b{position:absolute;inset:0;display:grid;place-items:center;font-size:var(--fs1);color:#fff;font-weight:900;text-shadow:0 1px 0 var(--navy)}
+.combo{position:absolute;left:14px;top:72px;z-index:3;display:flex;align-items:center;gap:4px;color:#fff;font-size:var(--fs2);font-weight:900;text-shadow:0 2px 0 var(--navy)}
+.combo img{width:26px;height:26px}
+.study .scope{position:absolute;right:14px;top:76px;z-index:3;color:#d8e6ff;font-size:var(--fs1)}
+.card{position:absolute;left:16px;right:16px;top:150px;padding:38px 18px 26px;text-align:center}
+.card .kind{position:absolute;left:50%;top:-15px;transform:translateX(-50%);height:30px;padding:0 14px;font-size:var(--fs2);border:var(--ol) solid var(--navy)}
+.card .word{font-size:48px;font-weight:900;letter-spacing:-.03em;line-height:1.1}
+.card .snd{position:absolute;right:12px;top:12px;width:44px;height:44px;border-radius:50%;background:var(--mint);border:var(--ol) solid var(--navy);box-shadow:inset 0 -4px 0 var(--mint-d);display:grid;place-items:center}
+.card .snd::before{content:"";border:9px solid transparent;border-left:13px solid var(--navy);margin-left:8px}
+.card .hint{margin-top:8px;color:var(--mute);font-size:var(--fs2);font-weight:600}
+.field{position:absolute;left:16px;right:16px;top:330px;height:62px;display:flex;align-items:center;padding:0 16px;border-radius:var(--r2);background:#fff;border:var(--ol) solid var(--navy);box-shadow:inset 0 4px 0 #dfe7fb;font-size:var(--fs4);font-weight:800}
+.field i{width:3px;height:26px;background:var(--blue);margin-left:2px;border-radius:2px}
+.field span{color:#9aa6cc;font-size:var(--fs3);font-weight:600;margin-left:8px}
+.study .acts{position:absolute;left:16px;right:16px;top:410px;display:grid;grid-template-columns:128px 1fr;gap:10px}
+.buddy{position:absolute;left:10px;bottom:150px;width:128px;height:128px}
+.buddy+.say{left:126px;right:auto;top:auto;bottom:226px}
+.buddy+.say::after{left:-9px;right:auto;top:auto;bottom:14px;border-width:0 0 3px 3px;transform:rotate(45deg)!important}
+.keys{position:absolute;left:0;right:0;bottom:0;height:138px;background:#cfd8ee;border-top:var(--ol) solid var(--navy);display:grid;place-items:center;color:#7482ad;font-size:var(--fs1);font-weight:600}
+.fb{position:absolute;left:0;right:0;bottom:0;z-index:5;padding:18px 16px 22px;background:var(--mint);border-top:var(--ol) solid var(--navy);transform:translateY(105%);transition:transform .28s cubic-bezier(.2,.9,.3,1.15)}
+.fb h4{font-size:var(--fs5);--sw:5px} .fb p{margin:2px 0 12px;font-size:var(--fs3);font-weight:800}
+.answered .fb{transform:none}
+
+/* ===== 야차전 준비 ===== */
+.yacha{background:linear-gradient(104deg,#3f86ff 0 49.4%,var(--navy) 49.4% 50.6%,#ff5648 50.6%)}
+.htabs{position:absolute;left:14px;right:14px;top:72px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;z-index:3}
+.htabs button{height:40px;border-radius:12px 12px 0 0;background:rgba(15,27,77,.55);color:#dfe8ff;font-size:var(--fs2);font-weight:800;border:2px solid rgba(255,255,255,.25);border-bottom:0}
+.htabs .on{background:#fff;color:var(--navy);border:var(--ol) solid var(--navy);border-bottom:0;height:46px;margin-top:-6px;font-weight:900}
+.vs{position:absolute;left:0;right:0;top:66px;height:190px}
+.vs .f{position:absolute;top:6px;width:150px;display:grid;justify-items:center}
+.vs .f.a{left:14px} .vs .f.b{right:14px}
+.vs .f img{width:128px;height:128px}
+.vs .who{display:grid;place-items:center;width:100px;height:100px;margin:14px 0;border-radius:50%;background:rgba(15,27,77,.5);border:3px dashed rgba(255,255,255,.7);font-size:64px}
+.vs .nm{margin-top:-4px;height:28px;padding:0 12px;border-radius:999px;background:var(--navy);color:#fff;font-size:var(--fs2);font-weight:800;display:flex;align-items:center;gap:6px}
+.vs h2{position:absolute;left:50%;top:44px;transform:translateX(-50%) rotate(-6deg);font-size:68px;line-height:1;--sw:8px}
+.sheet{position:absolute;left:0;right:0;top:300px;bottom:84px;padding:14px 14px 0;background:var(--cloud);border-top:var(--ol) solid var(--navy);border-radius:26px 26px 0 0;display:grid;gap:9px;align-content:start}
+.row{display:grid;grid-template-columns:44px 1fr;align-items:center;gap:8px}
+.row>label{font-size:var(--fs2);font-weight:900}
+.row small{grid-column:2;margin-top:-4px;font-size:var(--fs1);color:var(--mute);font-weight:600}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px}
+.seg button{display:flex;align-items:center;justify-content:center;gap:5px;height:46px;border-radius:14px;background:#fff;border:var(--ol) solid var(--navy);box-shadow:inset 0 -4px 0 #c3d0f2;font-size:var(--fs3);font-weight:900;transition:transform .07s}
+.seg button:active{transform:translateY(3px)}
+.seg button img{width:28px;height:28px}
+.seg .on{background:var(--sun);box-shadow:inset 0 3px 0 rgba(255,255,255,.5),inset 0 -4px 0 var(--sun-d)}
+.seg button em{font:800 11px Pretendard;background:var(--navy);color:#fff;border-radius:999px;padding:2px 6px}
+.pick{display:flex;align-items:center;justify-content:space-between;height:46px;padding:0 14px;border-radius:14px;background:#fff;border:var(--ol) solid var(--navy);box-shadow:inset 0 -4px 0 #c3d0f2;font-size:var(--fs3);font-weight:900}
+.pick span{font-size:var(--fs1);color:var(--mute);font-weight:700}
+.sheet .btn{margin-top:4px;height:62px;font-size:26px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* ===== 놀이터 ===== */
+.join{position:absolute;left:14px;right:14px;top:72px;height:50px;display:flex;align-items:center;gap:8px;padding:0 6px 0 14px;border-radius:16px;background:rgba(15,27,77,.5);border:2px solid rgba(255,255,255,.3);color:#fff;font-size:var(--fs2)}
+.join i{flex:1;height:34px;border-radius:10px;background:#fff;color:#9aa6cc;font-style:normal;display:flex;align-items:center;padding:0 10px;font-weight:600}
+.join .btn{height:38px;font-size:var(--fs2);border-radius:12px;padding:0 12px 3px;box-shadow:inset 0 -3px 0 var(--mint-d)}
+.feat{position:absolute;left:14px;right:14px;top:134px;height:162px;overflow:hidden;padding:0}
+.feat>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.feat::after{content:"";position:absolute;inset:40% 0 0;background:linear-gradient(transparent,rgba(15,27,77,.85))}
+.feat .new{position:absolute;left:-3px;top:12px;z-index:2;height:28px;padding:0 12px;border-radius:0 14px 14px 0;background:var(--red);border:var(--ol) solid var(--navy);color:#fff;font-size:var(--fs2);font-weight:900;display:flex;align-items:center}
+.feat h3{position:absolute;left:14px;bottom:12px;z-index:2;font-size:var(--fs5);line-height:1}
+.feat h3 small{display:block;font:800 12px Pretendard;color:#fff;-webkit-text-stroke:0;text-shadow:0 1px 0 var(--navy);margin-bottom:6px}
+.feat .btn{position:absolute;right:12px;bottom:12px;z-index:2;height:44px;font-size:var(--fs3);border-radius:14px}
+.arc .htabs{top:310px}
+.arc .htabs .on{color:var(--navy)}
+.grid{position:absolute;left:0;right:0;top:356px;bottom:84px;padding:12px 14px 0;background:var(--cloud);border-top:var(--ol) solid var(--navy);display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:112px;gap:10px}
+.tile{position:relative;overflow:hidden;border-radius:16px;border:var(--ol) solid var(--navy);box-shadow:0 4px 0 var(--navy);transition:transform .07s,box-shadow .07s;text-align:left}
+.tile:active{transform:translateY(4px);box-shadow:0 0 0 var(--navy)}
+.tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tile::after{content:"";position:absolute;inset:45% 0 0;background:linear-gradient(transparent,rgba(15,27,77,.9))}
+.tile b{position:absolute;left:10px;bottom:8px;z-index:2;font-size:19px;--sw:4px}
+.tile em{position:absolute;right:6px;top:6px;z-index:2;font-style:normal}
+
+/* ===== 결과 ===== */
+.res::before{background:repeating-conic-gradient(from 0deg at 50% 300px,rgba(255,255,255,.1) 0 12deg,transparent 12deg 24deg)}
+.res .rib{position:absolute;left:0;right:0;top:44px;text-align:center;font-size:52px;line-height:1;--sw:8px}
+.stars{position:absolute;left:0;right:0;top:108px;display:flex;justify-content:center;gap:2px}
+.stars img{width:58px;height:58px} .stars img:nth-child(2){width:74px;height:74px;margin-top:-12px}
+.res .pet{position:absolute;left:50%;top:176px;width:230px;height:230px;margin-left:-115px;z-index:1}
+.res .podium{top:356px;bottom:auto}
+.res .badge{position:absolute;right:34px;top:190px;width:92px;height:92px;z-index:2}
+.score{position:absolute;left:14px;right:14px;top:446px;padding:12px 14px 14px;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center}
+.score .n{grid-row:span 2;font-size:66px;line-height:.9;color:var(--navy)}
+.score .n small{font-size:22px}
+.score p{font-size:var(--fs3);font-weight:900} .score>span{font-size:var(--fs1);color:var(--mute);font-weight:700}
+.score .xp{grid-column:1/-1;width:100%;margin-top:8px}
+.rew{position:absolute;left:14px;right:14px;top:574px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.rew div{display:grid;justify-items:center;padding:6px 0 8px;border-radius:16px;background:var(--navy);border:2px solid rgba(255,255,255,.25);color:#fff;font-size:var(--fs1)}
+.rew img{width:40px;height:40px}
+.rew b{font-size:var(--fs4);color:var(--sun);line-height:1}
+.res .acts{position:absolute;left:14px;right:14px;bottom:26px;display:grid;gap:10px}
+</style>
+</head>
+<body>
+<div class="doc-head">
+  <a href="index.html">← 시안 목록</a>
+  <h1>시안 1 · 게임 로비형</h1>
+  <p>홈이 게임 로비입니다. 내 펫이 가운데 크게 서 있고, 공부는 "오늘의 퀘스트"입니다. 남색 테두리 · 눌리는 버튼 · 외곽선 제목으로 모든 화면이 한 벌입니다. 버튼과 칩은 눌러 볼 수 있습니다.</p>
+  <button class="replay">들어오는 움직임 다시 보기</button>
+</div>
+
+<div class="scroll"><div class="stage">
+
+<!-- 1. 홈 -->
+<figure class="shot"><figcaption>홈 <small>로비</small></figcaption>
+<div class="phone" data-screen="home">
+  <div class="top a-drop">
+    <div class="me"><div class="av"><img src="../../public/assets/pets/cat-1-s.webp" alt=""><b>3</b></div><p>김수머스<small>단원고 · 고1A</small></p></div>
+    <span class="sp"></span>
+    <span class="pill"><img src="../../public/assets/ui/streak.webp" alt="">7일</span>
+    <span class="pill"><img src="../../public/assets/ui/coin.webp" alt="">950</span>
+  </div>
+  <div class="side l">
+    <button class="a-up d2"><i><img src="../../public/assets/ui/attendance.webp" alt=""><em>!</em></i>출석</button>
+    <button class="a-up d3"><i><img src="../../public/assets/ui/egg-shop.webp" alt=""></i>알 상점</button>
+  </div>
+  <div class="side r">
+    <button class="a-up d2"><i><img src="../../public/assets/ui/trophy.webp" alt=""></i>랭킹</button>
+    <button class="a-up d3"><i><img src="../../public/assets/ui/gift.webp" alt=""><em>2</em></i>선물</button>
+  </div>
+  <div class="hero">
+    <h2 class="dsp ol a-pop d1">나비</h2>
+    <div class="lv a-up d2"><span class="chip sun">Lv.3 아기</span><span class="xp" style="--v:37%"><s></s></span></div>
+    <img class="pet a-pop d2" src="../../public/assets/pets/cat-1.webp" alt="내 펫 나비">
+    <div class="podium"></div>
+  </div>
+  <div class="say a-pop d5">오늘도 20개 가자!</div>
+  <section class="quest panel a-up d4">
+    <header><h3 class="dsp">오늘의 퀘스트</h3><span class="chip">1 / 3</span></header>
+    <div class="slots">
+      <div class="q done">출석<b>완료</b></div>
+      <div class="q now">단어<b>0 / 20</b></div>
+      <div class="q">야차전<b>0 / 1판</b></div>
+      <div class="chest"><img src="../../public/assets/ui/gift.webp" alt=""><b class="chip sun">+30</b></div>
+    </div>
+  </section>
+  <div class="go a-up d5">
+    <button class="range">오늘 범위<b>3과 · 4과</b></button>
+    <button class="btn">공부 시작</button>
+  </div>
+  <nav class="tabs">
+    <button class="tab"><img src="../../public/assets/ui/nav-study.webp" alt="">학습</button>
+    <button class="tab"><img src="../../public/assets/ui/nav-yacha.webp" alt="">야차전</button>
+    <button class="tab home on"><i><img src="../../public/assets/ui/nav-home.webp" alt=""></i>홈</button>
+    <button class="tab"><img src="../../public/assets/ui/nav-arcade.webp" alt="">놀이터</button>
+    <button class="tab"><img src="../../public/assets/ui/nav-me.webp" alt="">나</button>
+  </nav>
+</div></figure>
+
+<!-- 2. 학습 -->
+<figure class="shot"><figcaption>학습 <small>단어 연습 문제 · "정답 확인"을 눌러 보세요</small></figcaption>
+<div class="phone study" data-screen="study">
+  <div class="band"></div>
+  <div class="top"><button class="sq">×</button><div class="prog"><s></s><b>7 / 20</b></div></div>
+  <div class="combo a-pop d3"><img src="../../public/assets/ui/streak.webp" alt="">3연속 정답</div>
+  <div class="scope">3과 · 4과</div>
+  <section class="card panel a-up d1">
+    <span class="kind chip mint">뜻 직접 쓰기</span>
+    <button class="snd" aria-label="발음 듣기"></button>
+    <p class="word">extended</p>
+    <p class="hint">이 단어의 뜻을 써 보세요</p>
+  </section>
+  <div class="field a-up d2"><i></i><span>뜻을 입력하세요</span></div>
+  <div class="acts a-up d3">
+    <button class="btn white sm" style="height:58px;font-size:16px">모르겠어요</button>
+    <button class="btn" data-check>정답 확인</button>
+  </div>
+  <img class="buddy a-pop d4" src="../../public/assets/pets/cat-1-cheer.webp" alt="">
+  <div class="say a-pop d5">천천히 생각해 봐!</div>
+  <div class="keys">키보드 자리</div>
+  <div class="fb"><h4 class="dsp ol">정답!</h4><p>extended · 연장된, 늘어난</p><button class="btn white" style="width:100%" data-check>다음 문제</button></div>
+</div></figure>
+
+<!-- 3. 야차전 준비 -->
+<figure class="shot"><figcaption>야차전 <small>대결 준비</small></figcaption>
+<div class="phone yacha" data-screen="yacha">
+  <div class="top a-drop">
+    <h1 class="dsp ol" style="font-size:30px;line-height:1">야차전</h1>
+    <span class="sp"></span>
+    <span class="pill"><img src="../../public/assets/ui/league-bronze-s.webp" alt="">브론즈 · 0승</span>
+    <span class="pill"><img src="../../public/assets/ui/coin.webp" alt="">950</span>
+  </div>
+  <div class="vs">
+    <div class="f a a-up d1"><img src="../../public/assets/pets/cat-1.webp" alt=""><span class="nm">나비 <b style="color:var(--sun)">Lv.3</b></span></div>
+    <div class="f b a-up d2"><div class="who dsp ol">?</div><span class="nm">상대를 기다려요</span></div>
+    <h2 class="dsp ol sun a-pop d4">VS</h2>
+  </div>
+  <div class="htabs" style="top:258px">
+    <button class="on">대결</button><button>몬스터</button><button>던전</button><button>기록</button>
+  </div>
+  <section class="sheet">
+    <div class="row a-up d2"><label>방식</label>
+      <div class="seg" data-seg><button class="on"><img src="../../public/assets/ui/mode-speed.webp" alt="">스피드</button><button><img src="../../public/assets/ui/mode-skill.webp" alt="">실력</button></div>
+      <small>2분 · 4지선다 · 빠를수록 세게 때려요</small></div>
+    <div class="row a-up d3"><label>단어</label><button class="pick">3과 · 4과<span>268단어 ›</span></button></div>
+    <div class="row a-up d4"><label>범위</label>
+      <div class="seg" data-seg><button class="on">각자 내 범위 <em>추천</em></button><button>같은 범위</button></div></div>
+    <div class="row a-up d5"><label>판돈</label>
+      <div class="seg" data-seg><button class="on"><img src="../../public/assets/ui/coin.webp" alt="">10</button><button><img src="../../public/assets/ui/coin.webp" alt="">30</button><button><img src="../../public/assets/ui/coin.webp" alt="">50</button></div>
+      <small>이기면 +10 · 지면 −10</small></div>
+    <button class="btn red a-up d6"><span class="lbl">친구에게 도전장</span></button>
+    <div class="two a-up d7"><button class="btn white sm">봇과 연습</button><button class="btn white sm">방 번호로 입장</button></div>
+  </section>
+  <nav class="tabs">
+    <button class="tab"><img src="../../public/assets/ui/nav-study.webp" alt="">학습</button>
+    <button class="tab on"><img src="../../public/assets/ui/nav-yacha.webp" alt="">야차전</button>
+    <button class="tab home"><i><img src="../../public/assets/ui/nav-home.webp" alt=""></i>홈</button>
+    <button class="tab"><img src="../../public/assets/ui/nav-arcade.webp" alt="">놀이터</button>
+    <button class="tab"><img src="../../public/assets/ui/nav-me.webp" alt="">나</button>
+  </nav>
+</div></figure>
+
+<!-- 4. 놀이터 -->
+<figure class="shot"><figcaption>놀이터 <small>첫 화면</small></figcaption>
+<div class="phone arc" data-screen="arcade">
+  <div class="top a-drop">
+    <h1 class="dsp ol" style="font-size:30px;line-height:1">놀이터</h1>
+    <span class="sp"></span>
+    <span class="pill" style="padding-left:12px">오늘 33판</span>
+    <span class="pill"><img src="../../public/assets/ui/coin.webp" alt="">950</span>
+  </div>
+  <div class="join a-up d1">교실 게임<i>방 번호 4자리</i><button class="btn mint">입장</button></div>
+  <section class="feat panel a-up d2">
+    <img src="../../public/assets/runner/entry.webp" alt="">
+    <span class="new">새 게임</span>
+    <h3 class="dsp ol"><small>오늘의 도전 · 3판 남음</small>펫 대행진</h3>
+    <button class="btn">하러 가기</button>
+  </section>
+  <div class="htabs">
+    <button class="on">미니게임</button><button>코인 승부</button><button>상점</button><button>기록</button>
+  </div>
+  <div class="grid">
+    <button class="tile a-up d3"><img src="../../public/assets/arena/entry.webp" alt=""><em class="chip sun">5판</em><b class="dsp ol">펫 아레나</b></button>
+    <button class="tile a-up d3"><img src="../../public/assets/timing/entry.webp" alt=""><em class="chip sun">3판</em><b class="dsp ol">10초 맞추기</b></button>
+    <button class="tile a-up d4"><img src="../../public/assets/wall/entry.webp" alt=""><em class="chip sun">5판</em><b class="dsp ol">벽 통과</b></button>
+    <button class="tile a-up d4"><img src="../../public/assets/match/entry.webp" alt=""><em class="chip sun">5판</em><b class="dsp ol">짝 맞추기</b></button>
+    <button class="tile a-up d5"><img src="../../public/assets/fishing/bg-entry.webp" alt=""><em class="chip sun">5판</em><b class="dsp ol">낚시</b></button>
+    <button class="tile a-up d5"><img src="../../public/assets/claw/entry.webp" alt=""><em class="chip sun">5판</em><b class="dsp ol">인형뽑기</b></button>
+  </div>
+  <nav class="tabs">
+    <button class="tab"><img src="../../public/assets/ui/nav-study.webp" alt="">학습</button>
+    <button class="tab"><img src="../../public/assets/ui/nav-yacha.webp" alt="">야차전</button>
+    <button class="tab home"><i><img src="../../public/assets/ui/nav-home.webp" alt=""></i>홈</button>
+    <button class="tab on"><img src="../../public/assets/ui/nav-arcade.webp" alt="">놀이터</button>
+    <button class="tab"><img src="../../public/assets/ui/nav-me.webp" alt="">나</button>
+  </nav>
+</div></figure>
+
+<!-- 5. 결과 -->
+<figure class="shot"><figcaption>연습 결과 <small>보상</small></figcaption>
+<div class="phone res" data-screen="result">
+  <h2 class="rib dsp ol sun a-drop">훌륭해요!</h2>
+  <div class="stars"><img class="a-pop d3" src="../../public/assets/ui/star-word.webp" alt=""><img class="a-pop d4" src="../../public/assets/ui/star-word.webp" alt=""><img class="a-pop d5" src="../../public/assets/ui/star-word.webp" alt=""></div>
+  <img class="pet a-pop d2" src="../../public/assets/pets/cat-1-cheer.webp" alt="">
+  <div class="podium"></div>
+  <img class="badge a-pop d6" src="../../public/assets/ui/result-great.webp" alt="">
+  <section class="score panel a-up d4">
+    <div class="n dsp"><span data-count="85">85</span><small>점</small></div>
+    <p>20개 중 17개 정답</p><span>2분 41초 · 3과 · 4과</span>
+    <div class="xp" style="--v:62%"><s></s></div>
+  </section>
+  <div class="rew">
+    <div class="a-pop d6"><img src="../../public/assets/ui/coin.webp" alt=""><b class="dsp">+<span data-count="24">24</span></b>코인</div>
+    <div class="a-pop d7"><img src="../../public/assets/ui/xp.webp" alt=""><b class="dsp">+<span data-count="40">40</span></b>경험치</div>
+    <div class="a-pop d8"><img src="../../public/assets/ui/streak.webp" alt=""><b class="dsp">8일</b>연속 학습</div>
+  </div>
+  <div class="acts a-up d8">
+    <button class="btn">틀린 3개 다시 풀기</button>
+    <div class="two"><button class="btn white sm">답안 보기</button><button class="btn white sm">홈으로</button></div>
+  </div>
+</div></figure>
+
+</div></div>
+
+<div class="rules">
+  <section><h2>색 · 이름 붙인 13개</h2><table>
+    <tr><th><i class="sw" style="background:#0f1b4d"></i>남색</th><td><code>#0f1b4d</code> 모든 테두리 · 글자 · 탭 바</td></tr>
+    <tr><th><i class="sw" style="background:#3f86ff"></i>로비 파랑</th><td><code>#3f86ff</code> 게임 밖 화면 바탕(위)</td></tr>
+    <tr><th><i class="sw" style="background:#2248cf"></i>깊은 파랑</th><td><code>#2248cf</code> 바탕(아래) · 파란 버튼의 아래 단</td></tr>
+    <tr><th><i class="sw" style="background:#ffc928"></i>햇살 노랑</th><td><code>#ffc928</code> 주 버튼 · 고른 것. 화면에 하나</td></tr>
+    <tr><th><i class="sw" style="background:#d68a00"></i>노랑 단</th><td><code>#d68a00</code> 노란 버튼의 아래 단</td></tr>
+    <tr><th><i class="sw" style="background:#22d39b"></i>민트</th><td><code>#22d39b</code> 정답 · 완료 · 경험치(지금 그림 아이콘과 같은 색)</td></tr>
+    <tr><th><i class="sw" style="background:#0b8f65"></i>민트 단</th><td><code>#0b8f65</code></td></tr>
+    <tr><th><i class="sw" style="background:#ff5648"></i>대결 빨강</th><td><code>#ff5648</code> 야차전 주 버튼 · 알림 점 · 오답</td></tr>
+    <tr><th><i class="sw" style="background:#b9271d"></i>빨강 단</th><td><code>#b9271d</code></td></tr>
+    <tr><th><i class="sw" style="background:#9160ff"></i>보물 보라</th><td><code>#9160ff</code> 보상 상자 · 희귀한 것만</td></tr>
+    <tr><th><i class="sw" style="background:#eaf1ff"></i>구름</th><td><code>#eaf1ff</code> 공부 화면 바탕 · 시트</td></tr>
+    <tr><th><i class="sw" style="background:#fff"></i>흰색</th><td><code>#ffffff</code> 패널 · 보조 버튼</td></tr>
+    <tr><th><i class="sw" style="background:#56628c"></i>흐린 남색</th><td><code>#56628c</code> 설명 글(흰 바탕 5.9:1)</td></tr>
+  </table></section>
+  <section><h2>글자</h2><table>
+    <tr><th>제목 · 버튼</th><td><b>Bagel Fat One</b> (SIL OFL 1.1) · 서브셋 358KB</td></tr>
+    <tr><th>본문 · 숫자</th><td><b>Pretendard</b> 700 · 800 · 900 (SIL OFL 1.1) · 굵기 1개에 약 170KB</td></tr>
+    <tr><th>크기 6단계</th><td>12 · 14 · 17 · 22 · 30 · 44px (단어 문제만 48px)</td></tr>
+    <tr><th>외곽선 글자</th><td>화면 제목 · 펫 이름 · 그림 위 글자에만. 흰 글자 + 남색 4~8px + 아래 3px 그림자</td></tr>
+    <tr><th>굵기</th><td>본문 700, 강조 900. 600은 설명 글만</td></tr>
+  </table></section>
+  <section><h2>모양</h2><table>
+    <tr><th>둥근 정도</th><td>12px(칩 · 작은 칸) · 18px(버튼 · 패널) · 알약</td></tr>
+    <tr><th>테두리</th><td>누를 수 있는 것과 패널은 모두 남색 3px</td></tr>
+    <tr><th>버튼</th><td>색 블록 + 위 하이라이트 3px + 아래 단 5px + 남색 바닥 4px. 누르면 4px 내려가고 단이 사라짐(0.07초)</td></tr>
+    <tr><th>카드 대신</th><td>흰 패널(남색 테두리 + 아래 단). 한 화면에 1~2개. 나머지는 바탕 위에 바로</td></tr>
+    <tr><th>칩</th><td>남색 알약 + 흰 글자(자원 · 수량). 노랑 칩은 "남은 판"처럼 수량 강조만</td></tr>
+    <tr><th>탭 바</th><td>남색 띠 84px, 가운데 홈이 34px 솟음. 고른 탭은 아이콘이 커지고 글자가 노랑</td></tr>
+    <tr><th>아이콘</th><td>저장소의 3D 그림만. 이모지 금지, 영어 꼬리표 금지. × · › 같은 기호는 글자로</td></tr>
+  </table></section>
+  <section><h2>움직임 · 무게</h2><ul>
+    <li>들어올 때: 위 띠는 떨어지고(0.5초), 펫과 별은 통 튀고(0.46초), 패널은 아래에서 올라옴(0.42초). 0.06초씩 차례로.</li>
+    <li>모두 <code>transform</code> · <code>opacity</code>만 씁니다. blur · backdrop-filter · 끝없이 도는 애니메이션은 없습니다.</li>
+    <li>바탕 줄무늬 · 햇살은 CSS 그라디언트 한 장입니다(그림 파일 없음).</li>
+    <li>글꼴 무게: 제목용 358KB + 본문 2굵기 340KB = 약 700KB. 첫 화면에는 본문 1굵기만 먼저 받고 제목용은 <code>font-display:swap</code>으로 뒤에 받습니다.</li>
+  </ul></section>
+</div>
+<script src="mock.js"></script>
+</body>
+</html>

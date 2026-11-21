@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>시안 3 · 큰 글자 미니멀</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+/* ===== 시안 3 토큰 ===== */
+.phone{
+  --paper:#f2f1ec; --ink:#0d0e0b; --lime:#c9f23a; --lime-d:#a6cf12; --white:#fff;
+  --g1:#6f7068; --g2:#d8d7cf; --g3:#e6e5de; --red:#d93a22; --ink2:#1c1d19; --g1d:#9b9c93; --g2d:#2e2f2a;
+  --fs1:13px; --fs2:16px; --fs3:20px; --fs4:32px; --fs5:56px; --fs6:120px;
+  --r1:20px; --r2:32px;
+  font-family:Pretendard,sans-serif;font-weight:500;font-size:var(--fs2);color:var(--ink);background:var(--paper);letter-spacing:-.01em;
+}
+.phone.dark{background:var(--ink);color:var(--paper)}
+.big{font-weight:900;letter-spacing:-.045em;line-height:.98}
+.num{font-weight:900;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.sub{color:var(--g1);font-size:var(--fs1);font-weight:600} .dark .sub{color:var(--g1d)}
+/* 버튼: 테두리 · 그림자 없음. 누르면 살짝 줄어든다 */
+.btn{display:flex;align-items:center;justify-content:space-between;width:100%;height:64px;padding:0 26px;border-radius:999px;background:var(--ink);color:var(--paper);font-size:var(--fs3);font-weight:800;transition:transform .12s cubic-bezier(.2,.8,.2,1),opacity .12s}
+.btn:active{transform:scale(.96);opacity:.85}
+.btn::after{content:"";width:10px;height:10px;border:solid currentColor;border-width:3px 3px 0 0;transform:rotate(45deg)}
+.btn.lime{background:var(--lime);color:var(--ink)}
+.links{display:flex;justify-content:center;gap:28px;font-size:var(--fs2);font-weight:700;color:var(--g1)} .dark .links{color:var(--g1d)}
+.links button{height:44px;transition:opacity .12s} .links button:active{opacity:.5}
+.top{position:absolute;left:24px;right:24px;top:22px;display:flex;align-items:center;gap:8px;font-size:var(--fs1);font-weight:700;z-index:3}
+.top .sp{flex:1}
+.top .coin{display:flex;align-items:center;gap:4px;font-size:var(--fs2);font-weight:800}
+.top .coin img{width:22px;height:22px}
+/* 줄 목록: 카드 없이 가는 선으로만 */
+.rows>*{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:62px;border-top:1px solid var(--g2);text-align:left;font-size:var(--fs2);font-weight:700;transition:opacity .12s}
+.rows>*:active{opacity:.5}
+.dark .rows>*{border-color:var(--g2d)}
+.rows small{display:block;font-size:var(--fs1);color:var(--g1);font-weight:600} .dark .rows small{color:var(--g1d)}
+.rows .num{font-size:var(--fs4)} .rows .num em{font-style:normal;font-size:var(--fs2);font-weight:700;margin-left:2px;letter-spacing:0}
+.tabs{position:absolute;left:0;right:0;bottom:0;height:76px;padding:0 14px 12px;display:grid;grid-template-columns:repeat(5,1fr);align-items:center;background:var(--paper);border-top:1px solid var(--g2)}
+.dark .tabs{background:var(--ink);border-color:var(--g2d)}
+.tab{position:relative;height:44px;font-size:var(--fs2);font-weight:700;color:var(--g1);transition:opacity .12s} .tab:active{opacity:.5}
+.dark .tab{color:var(--g1d)}
+.tab.on{color:inherit;font-weight:900}
+.tab.on::after{content:"";position:absolute;left:50%;bottom:0;width:22px;height:5px;margin-left:-11px;border-radius:3px;background:var(--lime)}
+.light .tab.on::after{background:var(--ink)}
+.seg{display:flex;gap:6px}
+.seg button{display:flex;align-items:center;gap:4px;height:40px;padding:0 16px;border-radius:999px;font-size:var(--fs2);font-weight:800;color:var(--g1d);transition:transform .12s}
+.seg button:active{transform:scale(.94)}
+.seg button img{width:20px;height:20px}
+.seg .on{background:var(--lime);color:var(--ink)}
+/* 큰 글자가 아래에서 올라오는 움직임 */
+@keyframes rise{from{transform:translateY(105%)}to{transform:none}}
+.mask{display:block;overflow:hidden;padding-bottom:.08em}
+.mask>span{display:block;animation:rise .7s cubic-bezier(.16,1,.3,1) both}
+.mask.m2>span{animation-delay:.09s}
+@keyframes wipe{from{transform:scaleX(0)}to{transform:none}}
+
+/* ===== 홈 ===== */
+.home h2{position:absolute;left:24px;top:74px;font-size:68px;z-index:2}
+.home .meta{position:absolute;left:26px;top:222px;z-index:2}
+.home .disc{position:absolute;right:-70px;top:214px;width:330px;height:330px;border-radius:50%;background:var(--lime);animation:in-pop .7s cubic-bezier(.16,1,.3,1) both}
+.home .pet{position:absolute;right:4px;top:234px;width:284px;height:284px;z-index:1}
+.home .name{position:absolute;left:26px;top:454px;z-index:2;font-size:var(--fs1);font-weight:700;line-height:1.3}
+.home .name b{display:block;font-size:var(--fs3);font-weight:900}
+.home .cta{position:absolute;left:20px;right:20px;top:528px}
+.home .rows{position:absolute;left:24px;right:24px;top:604px}
+.home .rows>*:last-child{border-bottom:0}
+
+/* ===== 학습 ===== */
+.line{position:absolute;left:0;right:0;top:0;height:5px;background:var(--g3)}
+.line s{display:block;height:100%;width:35%;background:var(--ink);transform-origin:left;animation:wipe .8s cubic-bezier(.16,1,.3,1) both}
+.study .cnt{position:absolute;left:24px;top:74px;font-size:var(--fs4)}
+.study .cnt em{font-style:normal;color:var(--g1);font-size:var(--fs3);font-weight:700;letter-spacing:0}
+.study .kind{position:absolute;left:26px;top:170px}
+.study h2{position:absolute;left:22px;right:22px;top:196px;font-size:72px}
+.study .snd{position:absolute;left:24px;top:292px;height:40px;padding:0 16px;border-radius:999px;background:var(--g3);font-size:var(--fs1);font-weight:800;display:flex;align-items:center;gap:8px}
+.study .snd::before{content:"";border:6px solid transparent;border-left:9px solid var(--ink);margin-right:-6px}
+.study .pet{position:absolute;right:12px;top:54px;width:96px;height:96px}
+.field{position:absolute;left:24px;right:24px;top:372px;height:64px;display:flex;align-items:center;border-bottom:3px solid var(--ink);font-size:26px;font-weight:700;color:#aeada5;letter-spacing:-.03em}
+.field i{width:3px;height:32px;background:var(--ink);margin-right:8px}
+.study .acts{position:absolute;left:20px;right:20px;top:468px;display:grid;gap:8px}
+.keys{position:absolute;left:0;right:0;bottom:0;height:138px;background:var(--g3);display:grid;place-items:center;color:var(--g1);font-size:var(--fs1)}
+.fb{position:absolute;left:0;right:0;bottom:0;z-index:5;padding:28px 20px 26px;background:var(--lime);border-radius:var(--r2) var(--r2) 0 0;transform:translateY(102%);transition:transform .45s cubic-bezier(.16,1,.3,1)}
+.fb h4{font-size:var(--fs5)} .fb p{margin:10px 4px 22px;font-size:var(--fs3);font-weight:800}
+.answered .fb{transform:none}
+
+/* ===== 야차전(어두운 면) ===== */
+.ytabs{position:absolute;left:24px;top:62px;display:flex;gap:18px;font-size:var(--fs2);font-weight:700;color:var(--g1d)}
+.ytabs .on{color:var(--paper);font-weight:900}
+.yacha h2{position:absolute;left:16px;top:110px;font-size:150px;color:var(--lime);letter-spacing:-.07em;line-height:.9}
+.yacha .pet{position:absolute;right:4px;top:100px;width:168px;height:168px;z-index:1}
+.yacha .who{position:absolute;right:20px;top:186px;display:grid;place-items:center;width:92px;height:92px;border-radius:50%;border:2px dashed var(--g1d);font-size:44px;font-weight:900;color:var(--g1d)}
+.yacha .vsmeta{position:absolute;left:26px;top:276px}
+.yacha .vsmeta b{color:var(--paper);font-weight:800}
+.yacha .rows{position:absolute;left:24px;right:24px;top:314px}
+.yacha .rows>*{min-height:60px}
+.yacha .acts{position:absolute;left:20px;right:20px;top:570px;display:grid;gap:6px}
+.pick{display:flex;align-items:center;gap:8px;font-weight:800} .pick::after{content:"";width:8px;height:8px;border:solid var(--g1d);border-width:2px 2px 0 0;transform:rotate(45deg)}
+
+/* ===== 놀이터 ===== */
+.arc h2{position:absolute;left:24px;top:66px;font-size:var(--fs5)}
+.arc .left{position:absolute;right:24px;top:74px;text-align:right;line-height:1}
+.arc .left .num{font-size:44px;background:linear-gradient(transparent 58%,var(--lime) 58%);padding:0 4px}
+.feat{position:absolute;left:20px;right:20px;top:146px;height:206px;border-radius:var(--r2);overflow:hidden;text-align:left;color:#fff;transition:transform .15s cubic-bezier(.2,.8,.2,1)}
+.feat:active,.mini:active{transform:scale(.97)}
+.feat img,.mini img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.feat::after,.mini::after{content:"";position:absolute;inset:38% 0 0;background:linear-gradient(transparent,rgba(13,14,11,.82))}
+.feat p{position:absolute;left:22px;bottom:18px;z-index:1;font-size:var(--fs4);font-weight:900;letter-spacing:-.04em;line-height:1}
+.feat p small{display:block;font-size:var(--fs1);font-weight:700;letter-spacing:0;margin-bottom:8px;color:var(--lime)}
+.minis{position:absolute;left:20px;right:20px;top:364px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.mini{position:relative;height:112px;border-radius:var(--r1);overflow:hidden;color:#fff;text-align:left;transition:transform .15s}
+.mini b{position:absolute;left:12px;bottom:10px;z-index:1;font-size:var(--fs2);font-weight:800;line-height:1.1}
+.arc .rows{position:absolute;left:24px;right:24px;top:494px}
+.arc .rows>*{min-height:58px}
+.arc .rows .go{display:flex;align-items:center;gap:10px;color:var(--g1);font-size:var(--fs1);font-weight:700}
+.arc .rows .go::after{content:"";width:8px;height:8px;border:solid var(--ink);border-width:2px 2px 0 0;transform:rotate(45deg)}
+
+/* ===== 결과 ===== */
+.res{background:var(--lime)}
+.res .kicker{position:absolute;left:26px;top:74px;font-size:var(--fs2);font-weight:800}
+.res h2{position:absolute;left:14px;top:92px;font-size:232px;letter-spacing:-.07em;line-height:1}
+.res h2 em{font-style:normal;font-size:44px;letter-spacing:-.02em;margin-left:6px}
+.res .of{position:absolute;left:26px;top:330px;font-size:var(--fs3);font-weight:800}
+.res .pet{position:absolute;right:-8px;top:300px;width:230px;height:230px;z-index:1}
+.res .rows{position:absolute;left:24px;right:24px;top:500px}
+.res .rows>*{border-color:rgba(13,14,11,.22);min-height:56px}
+.res .rows small{color:rgba(13,14,11,.6)}
+.res .rows img{width:28px;height:28px;margin-right:10px}
+.res .rows>*>span:first-child{display:flex;align-items:center}
+.res .acts{position:absolute;left:20px;right:20px;bottom:18px;display:grid;gap:4px}
+.res .links{color:rgba(13,14,11,.65)}
+</style>
+</head>
+<body>
+<div class="doc-head">
+  <a href="index.html">← 시안 목록</a>
+  <h1>시안 3 · 큰 글자 미니멀</h1>
+  <p>카드 · 테두리 · 그림자가 없습니다. 아주 큰 글자와 숫자, 넓은 여백, 강조색 하나(라임)만 씁니다. 색을 가진 것은 펫과 게임 그림뿐입니다. 야차전만 검은 면으로 뒤집어 긴장감을 줍니다. 움직임(큰 글자가 올라오고 숫자가 세어짐)으로 고급스럽게 보이게 합니다.</p>
+  <button class="replay">들어오는 움직임 다시 보기</button>
+</div>
+
+<div class="scroll"><div class="stage">
+
+<!-- 1. 홈 -->
+<figure class="shot"><figcaption>홈 <small>오늘 할 것 하나</small></figcaption>
+<div class="phone home light" data-screen="home">
+  <div class="top a-fade"><span>11월 18일 수요일</span><span class="sp"></span><span class="coin"><img src="../../public/assets/ui/coin.webp" alt="">950</span></div>
+  <h2 class="big"><span class="mask"><span>오늘은</span></span><span class="mask m2"><span>20단어</span></span></h2>
+  <p class="meta sub a-fade d4">3과 · 4과 · 약 6분</p>
+  <i class="disc"></i>
+  <img class="pet a-up d3" src="../../public/assets/pets/cat-1.webp" alt="내 펫 나비">
+  <p class="name a-fade d5"><b>나비</b>Lv.3 · 다음 진화까지 63%</p>
+  <div class="cta a-up d5"><button class="btn">시작하기</button></div>
+  <div class="rows">
+    <button class="a-up d6"><span>복습<small>어제 틀린 단어</small></span><span class="num">12<em>개</em></span></button>
+    <button class="a-up d7"><span>연속 학습<small>오늘 하면 8일</small></span><span class="num">7<em>일</em></span></button>
+  </div>
+  <nav class="tabs"><button class="tab on">홈</button><button class="tab">학습</button><button class="tab">야차전</button><button class="tab">놀이터</button><button class="tab">나</button></nav>
+</div></figure>
+
+<!-- 2. 학습 -->
+<figure class="shot"><figcaption>학습 <small>단어 연습 문제 · "확인"을 눌러 보세요</small></figcaption>
+<div class="phone study" data-screen="study">
+  <div class="line"><s></s></div>
+  <div class="top"><button style="height:44px;font-weight:700">닫기</button></div>
+  <p class="cnt num">07<em> / 20</em></p>
+  <img class="pet a-up d2" src="../../public/assets/pets/cat-1.webp" alt="">
+  <p class="kind sub a-fade d1">뜻 직접 쓰기 · 3연속 정답</p>
+  <h2 class="big"><span class="mask"><span>extended</span></span></h2>
+  <button class="snd a-fade d3">발음 듣기</button>
+  <div class="field a-up d3"><i></i>뜻을 입력하세요</div>
+  <div class="acts a-up d4"><button class="btn" data-check>확인</button><div class="links"><button>모르겠어요</button></div></div>
+  <div class="keys">키보드 자리</div>
+  <div class="fb"><h4 class="big">정답</h4><p>extended · 연장된, 늘어난</p><button class="btn" data-check>다음</button></div>
+</div></figure>
+
+<!-- 3. 야차전 -->
+<figure class="shot"><figcaption>야차전 <small>대결 준비 · 검은 면</small></figcaption>
+<div class="phone yacha dark" data-screen="yacha">
+  <div class="top a-fade"><span>야차전 · 브론즈 0승 0패</span><span class="sp"></span><span class="coin"><img src="../../public/assets/ui/coin.webp" alt="">950</span></div>
+  <div class="ytabs"><span class="on">대결</span><span>몬스터</span><span>던전</span><span>기록</span></div>
+  <h2 class="big"><span class="mask"><span>VS</span></span></h2>
+  <img class="pet a-up d2" src="../../public/assets/pets/cat-1.webp" alt="">
+  <p class="vsmeta sub a-fade d4"><b>나비 Lv.3</b> · 상대를 기다려요</p>
+  <div class="rows">
+    <div class="a-up d3"><span>방식<small>2분 · 4지선다</small></span><span class="seg" data-seg><button class="on">스피드</button><button>실력</button></span></div>
+    <button class="a-up d4"><span>단어<small>268단어</small></span><span class="pick">3과 · 4과</span></button>
+    <div class="a-up d5"><span>범위</span><span class="seg" data-seg><button class="on">각자</button><button>같이</button></span></div>
+    <div class="a-up d6"><span>판돈<small>이기면 +10 · 지면 −10</small></span><span class="seg" data-seg><button class="on">10</button><button>30</button><button>50</button></span></div>
+  </div>
+  <div class="acts a-up d7"><button class="btn lime">친구에게 도전장</button><div class="links"><button>봇과 연습</button><button>방 번호로 입장</button></div></div>
+  <nav class="tabs"><button class="tab">홈</button><button class="tab">학습</button><button class="tab on">야차전</button><button class="tab">놀이터</button><button class="tab">나</button></nav>
+</div></figure>
+
+<!-- 4. 놀이터 -->
+<figure class="shot"><figcaption>놀이터 <small>첫 화면</small></figcaption>
+<div class="phone arc light" data-screen="arcade">
+  <div class="top a-fade"><span>놀이터</span><span class="sp"></span><span class="coin"><img src="../../public/assets/ui/coin.webp" alt="">950</span></div>
+  <h2 class="big"><span class="mask"><span>놀이터</span></span></h2>
+  <p class="left a-fade d3"><span class="num">33</span><br><span class="sub">오늘 남은 판</span></p>
+  <button class="feat a-up d2"><img src="../../public/assets/runner/entry.webp" alt=""><p><small>새 게임 · 3판 남음</small>펫 대행진</p></button>
+  <div class="minis">
+    <button class="mini a-up d3"><img src="../../public/assets/arena/entry.webp" alt=""><b>펫<br>아레나</b></button>
+    <button class="mini a-up d4"><img src="../../public/assets/timing/entry.webp" alt=""><b>10초<br>맞추기</b></button>
+    <button class="mini a-up d5"><img src="../../public/assets/wall/entry.webp" alt=""><b>벽<br>통과</b></button>
+  </div>
+  <div class="rows">
+    <button class="a-up d5"><span>미니게임 모두 보기</span><span class="go">8가지 · 18판</span></button>
+    <button class="a-up d6"><span>코인 승부</span><span class="go">10판</span></button>
+    <button class="a-up d7"><span>상점</span><span class="go">알 · 뽑기</span></button>
+    <button class="a-up d8"><span>교실 게임</span><span class="go">방 번호 입력</span></button>
+  </div>
+  <nav class="tabs"><button class="tab">홈</button><button class="tab">학습</button><button class="tab">야차전</button><button class="tab on">놀이터</button><button class="tab">나</button></nav>
+</div></figure>
+
+<!-- 5. 결과 -->
+<figure class="shot"><figcaption>연습 결과 <small>보상</small></figcaption>
+<div class="phone res" data-screen="result">
+  <p class="kicker a-fade">연습 결과 · 3과 · 4과</p>
+  <h2 class="big num"><span class="mask"><span><span data-count="85">85</span><em>점</em></span></span></h2>
+  <p class="of a-fade d4">20개 중 17개 정답 · 2분 41초</p>
+  <img class="pet a-up d3" src="../../public/assets/pets/cat-1-cheer.webp" alt="">
+  <div class="rows">
+    <div class="a-up d5"><span><img src="../../public/assets/ui/coin.webp" alt="">코인</span><span class="num">+<span data-count="24">24</span></span></div>
+    <div class="a-up d6"><span><img src="../../public/assets/ui/xp.webp" alt="">경험치</span><span class="num">+<span data-count="40">40</span></span></div>
+    <div class="a-up d7"><span><img src="../../public/assets/ui/streak.webp" alt="">연속 학습</span><span class="num">8<em>일</em></span></div>
+  </div>
+  <div class="acts a-up d8"><button class="btn">틀린 3개 다시 풀기</button><div class="links"><button>답안 보기</button><button>홈으로</button></div></div>
+</div></figure>
+
+</div></div>
+
+<div class="rules">
+  <section><h2>색 · 이름 붙인 10개</h2><table>
+    <tr><th><i class="sw" style="background:#f2f1ec"></i>종이</th><td><code>#f2f1ec</code> 밝은 면 바탕</td></tr>
+    <tr><th><i class="sw" style="background:#0d0e0b"></i>먹</th><td><code>#0d0e0b</code> 글자 · 주 버튼 · 어두운 면 바탕(야차전)</td></tr>
+    <tr><th><i class="sw" style="background:#c9f23a"></i>라임</th><td><code>#c9f23a</code> 하나뿐인 강조색. 고른 것 · 정답 · 결과 화면. 글자는 항상 먹색(16:1)</td></tr>
+    <tr><th><i class="sw" style="background:#6f7068"></i>회색 글자</th><td><code>#6f7068</code> 설명(종이 위 4.6:1)</td></tr>
+    <tr><th><i class="sw" style="background:#9b9c93"></i>회색 글자(어두운 면)</th><td><code>#9b9c93</code> (먹 위 6.8:1)</td></tr>
+    <tr><th><i class="sw" style="background:#d8d7cf"></i>가는 선</th><td><code>#d8d7cf</code> 줄 사이 1px</td></tr>
+    <tr><th><i class="sw" style="background:#2e2f2a"></i>가는 선(어두운 면)</th><td><code>#2e2f2a</code></td></tr>
+    <tr><th><i class="sw" style="background:#e6e5de"></i>회색 면</th><td><code>#e6e5de</code> 보조 알약 · 빈 진행 줄</td></tr>
+    <tr><th><i class="sw" style="background:#d93a22"></i>빨강</th><td><code>#d93a22</code> 오답 · 경고에만</td></tr>
+    <tr><th><i class="sw" style="background:#fff"></i>흰색</th><td><code>#ffffff</code> 그림 위 글자에만</td></tr>
+  </table></section>
+  <section><h2>글자</h2><table>
+    <tr><th>글꼴</th><td><b>Pretendard</b> 하나만 (SIL OFL 1.1). 500 · 700 · 900 세 굵기 = 약 510KB, 가변 파일 하나면 432KB</td></tr>
+    <tr><th>크기 6단계</th><td>13 · 16 · 20 · 32 · 56 · 120px (가장 작은 글자가 13px, 본문은 16px)</td></tr>
+    <tr><th>큰 글자</th><td>900 굵기 · 자간 −4.5% · 줄 높이 0.98. 화면마다 큰 글자는 한 덩이만</td></tr>
+    <tr><th>숫자</th><td>폭이 같은 숫자(tabular)로 세어 올라갈 때 흔들리지 않게</td></tr>
+  </table></section>
+  <section><h2>모양</h2><table>
+    <tr><th>둥근 정도</th><td>20px(작은 그림) · 32px(큰 그림 · 시트) · 알약(버튼)</td></tr>
+    <tr><th>테두리 · 그림자</th><td>없음. 구분은 여백과 1px 선으로만</td></tr>
+    <tr><th>버튼</th><td>먹색 알약 64px, 화면에 하나. 누르면 96%로 줄어듦(0.12초). 나머지는 글자 버튼(누름 영역 44px)</td></tr>
+    <tr><th>카드 대신</th><td>줄 목록(왼쪽 이름 · 오른쪽 큰 숫자). 그림이 있는 것만 둥근 그림 칸</td></tr>
+    <tr><th>칩</th><td>고른 것만 라임 알약. 안 고른 것은 글자만</td></tr>
+    <tr><th>탭 바</th><td>아이콘 없이 글자 5개. 고른 탭 아래 짧은 줄</td></tr>
+    <tr><th>아이콘</th><td>코인 · 경험치 · 연속 학습 3D 그림만 작게. 이모지 · 영어 꼬리표 · 장식 아이콘 금지</td></tr>
+  </table></section>
+  <section><h2>움직임 · 무게</h2><ul>
+    <li>큰 글자가 가려진 칸 아래에서 올라옵니다(0.7초, 부드럽게 멈춤). 숫자는 0에서 세어 올라갑니다(0.9초).</li>
+    <li>줄은 0.06초 간격으로 차례로 올라옵니다. 정답이면 라임 면이 아래에서 올라옵니다(0.45초).</li>
+    <li><code>transform</code> · <code>opacity</code>만 씁니다. blur · backdrop-filter · 끝없는 애니메이션 없음. 그라디언트는 그림 위 글자 받침뿐입니다.</li>
+    <li>세 시안 가운데 가장 가볍습니다(그림자 0 · 테두리 0 · 글꼴 1개).</li>
+  </ul></section>
+</div>
+<script src="mock.js"></script>
+</body>
+</html>
