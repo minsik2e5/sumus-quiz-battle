@@ -150,6 +150,8 @@ for (let r = 0; r < ROUNDS; r++) {
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   await D.again(page, r, r === ROUNDS - 1);
   await gc(); { const m = await metrics(); heap.push(r1(m.JSHeapUsedSize / 1048576)); nodes.push(m.Nodes); listeners.push(m.JSEventListeners); }
+  // V13.246 --dom: 판마다 문서 안 요소 수와 많은 클래스(노드가 늘면 문서 안에 쌓이는지, 문서 밖에 붙잡혀 있는지 가른다)
+  if (has('dom')) console.error('dom: ' + await page.evaluate(() => { const c = {}; for (const e of document.querySelectorAll('*')) { const k = e.tagName.toLowerCase() + '.' + String(e.className?.baseVal ?? e.className).split(' ')[0]; c[k] = (c[k] || 0) + 1; } return document.querySelectorAll('*').length + ' ' + Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => k + ' ' + v).join(' · '); }));
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU });
 }
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
