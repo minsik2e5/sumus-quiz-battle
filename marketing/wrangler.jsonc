@@ -1,0 +1,6 @@
+{
+  // 썸어스 마케팅 운영표 - Cloudflare Workers 정적 사이트 (서버 코드 없음)
+  "name": "sumus-marketing",
+  "compatibility_date": "2026-09-01",
+  "assets": { "directory": "./site" }
+}

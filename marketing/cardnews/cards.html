@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700;900&display=swap">
+<style>
+/* 썸어스 카드뉴스 틀 v2: 1080x1350(4:5)
+   표지 = 파랑, 본문 = 종이색 + 흰 패널, 마지막 = 남색. 노란 형광펜으로 핵심 강조 */
+:root {
+  --blue: #2F6FF0; --blue-2: #6FA3FF; --blue-3: #BCD5FF; --blue-4: #E6EFFF;
+  --navy: #101C33; --ink: #141B26; --sub: #4A5565; --muted: #8A94A3;
+  --paper: #F5F6F8; --panel: #FFFFFF; --line: #E3E7EC; --hl: #FFE45C;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #ccc; font-family: "Noto Sans KR", sans-serif; letter-spacing: -0.035em; }
+.card { width: 1080px; height: 1350px; position: relative; overflow: hidden; display: flex; flex-direction: column; padding: 64px 88px 0; background: var(--paper); color: var(--ink); }
+.card.cover { background: var(--blue); color: #fff; }
+.card.end { background: var(--navy); color: #fff; }
+
+/* 위: 진행 막대 + 브랜드 */
+.top { display: grid; gap: 30px; }
+.prog { display: grid; grid-template-columns: repeat(var(--n), 1fr); gap: 10px; }
+.prog i { height: 8px; border-radius: 4px; background: rgba(20, 27, 38, .12); }
+.prog i.on { background: var(--blue); }
+.cover .prog i, .end .prog i { background: rgba(255,255,255,.25); }
+.cover .prog i.on, .end .prog i.on { background: #fff; }
+.bar { display: flex; justify-content: space-between; align-items: center; font-size: 30px; font-weight: 700; color: var(--muted); }
+.cover .bar, .end .bar { color: rgba(255,255,255,.75); }
+.logo { display: flex; align-items: center; gap: 14px; color: var(--ink); font-weight: 900; font-size: 34px; letter-spacing: 0.02em; }
+.cover .logo, .end .logo { color: #fff; }
+.mark { width: 44px; height: 44px; border-radius: 14px; background: var(--blue); position: relative; }
+.mark::after { content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--hl); right: 7px; top: 7px; }
+.cover .mark { background: #fff; }
+.end .mark { background: var(--blue); }
+
+.body { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 34px; padding: 40px 0 30px; position: relative; z-index: 1; }
+.foot { height: 112px; display: flex; align-items: center; justify-content: space-between; font-size: 28px; font-weight: 700; color: var(--muted); position: relative; z-index: 1; }
+.cover .foot, .end .foot { color: rgba(255,255,255,.7); }
+
+.kicker { display: inline-flex; align-self: flex-start; align-items: center; gap: 12px; font-size: 32px; font-weight: 900; color: var(--blue); background: var(--blue-4); padding: 12px 24px; border-radius: 999px; }
+.cover .kicker { background: rgba(255,255,255,.16); color: #fff; }
+.end .kicker { background: rgba(255,255,255,.1); color: var(--blue-2); }
+h1 { font-size: 124px; line-height: 1.16; font-weight: 900; word-break: keep-all; letter-spacing: -0.05em; }
+h2 { font-size: 80px; line-height: 1.24; font-weight: 900; word-break: keep-all; letter-spacing: -0.045em; }
+.hl { background: linear-gradient(transparent 58%, var(--hl) 58%, var(--hl) 92%, transparent 92%); padding: 0 6px; margin: 0 -6px; }
+.cover .hl { background: none; color: var(--hl); padding: 0; margin: 0; }
+.end .hl { background: none; color: var(--blue-2); padding: 0; margin: 0; }
+.lead { font-size: 40px; line-height: 1.55; font-weight: 500; color: var(--sub); word-break: keep-all; }
+.lead b { color: var(--ink); font-weight: 900; }
+.cover .lead, .end .lead { color: rgba(255,255,255,.86); }
+
+.panel { background: var(--panel); border-radius: 40px; padding: 48px 52px; box-shadow: 0 2px 0 rgba(20,27,38,.04), 0 18px 40px -24px rgba(20,27,38,.25); }
+
+/* 표지 장식 */
+.giant { position: absolute; right: -60px; bottom: 60px; font-size: 760px; line-height: .8; font-weight: 900; color: rgba(255,255,255,.09); letter-spacing: -0.06em; z-index: 0; }
+.sticker { position: absolute; right: 96px; top: 250px; background: var(--hl); color: var(--ink); font-size: 34px; font-weight: 900; padding: 18px 30px; border-radius: 999px; transform: rotate(8deg); box-shadow: 0 10px 0 rgba(0,0,0,.12); z-index: 2; }
+.swipe { display: inline-flex; align-items: center; gap: 16px; font-size: 34px; font-weight: 900; background: #fff; color: var(--blue); padding: 20px 34px; border-radius: 999px; align-self: flex-start; }
+
+/* 점수 vs 순서 */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.cmp { border-radius: 36px; padding: 40px 36px; display: grid; gap: 14px; align-content: start; }
+.cmp.a { background: var(--panel); box-shadow: 0 18px 40px -24px rgba(20,27,38,.25); }
+.cmp.b { background: var(--blue); color: #fff; }
+.cmp .k { font-size: 32px; font-weight: 700; opacity: .8; }
+.cmp .v { font-size: 60px; font-weight: 900; line-height: 1.1; }
+.cmp .d { font-size: 32px; line-height: 1.45; font-weight: 500; opacity: .85; }
+
+/* 100칸 점 그림 */
+.waffle { display: grid; grid-template-columns: repeat(10, 1fr); gap: 9px; width: 480px; margin: 0 auto; }
+.waffle i { aspect-ratio: 1; border-radius: 50%; }
+.g1 { background: var(--blue); } .g2 { background: var(--blue-2); } .g3 { background: var(--blue-3); } .g4 { background: #D5DBE3; } .g5 { background: #EEF1F4; box-shadow: inset 0 0 0 3px #DCE1E7; }
+.wlegend { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 6px; }
+.wlegend div { display: grid; gap: 4px; justify-items: center; font-size: 28px; font-weight: 700; color: var(--sub); }
+.wlegend b { font-size: 40px; font-weight: 900; color: var(--ink); }
+.wlegend div:first-child b { color: var(--blue); }
+.wlegend i { width: 22px; height: 22px; border-radius: 50%; }
+
+/* 300명 → 30명 */
+.funnel { display: grid; grid-template-columns: 1fr 90px 1fr; align-items: center; gap: 10px; }
+.fn { border-radius: 36px; padding: 44px 30px; text-align: center; display: grid; gap: 8px; }
+.fn.a { background: var(--panel); box-shadow: 0 18px 40px -24px rgba(20,27,38,.25); }
+.fn.b { background: var(--blue); color: #fff; }
+.fn .k { font-size: 32px; font-weight: 700; opacity: .8; }
+.fn .v { font-size: 120px; font-weight: 900; line-height: 1; letter-spacing: -0.05em; }
+.fn .v small { font-size: 50px; margin-left: 4px; }
+.fn .d { font-size: 30px; font-weight: 500; opacity: .8; }
+.arrow { font-size: 80px; font-weight: 900; color: var(--blue); text-align: center; }
+.note { display: flex; gap: 20px; align-items: center; background: var(--hl); border-radius: 28px; padding: 30px 36px; font-size: 38px; font-weight: 900; line-height: 1.4; word-break: keep-all; }
+
+/* 체크리스트 */
+.list { display: grid; gap: 20px; }
+.li { display: grid; grid-template-columns: 96px 1fr; gap: 30px; align-items: center; background: var(--panel); border-radius: 32px; padding: 34px 40px; box-shadow: 0 18px 40px -26px rgba(20,27,38,.25); }
+.li .n { width: 96px; height: 96px; border-radius: 30px; background: var(--blue); color: #fff; font-size: 50px; font-weight: 900; display: grid; place-items: center; }
+.li b { font-size: 46px; font-weight: 900; display: block; line-height: 1.3; word-break: keep-all; }
+.li span { font-size: 32px; color: var(--sub); font-weight: 500; line-height: 1.4; display: block; margin-top: 6px; word-break: keep-all; }
+.save { display: flex; align-items: center; gap: 16px; font-size: 32px; font-weight: 700; color: var(--sub); }
+.save svg { width: 40px; height: 40px; }
+
+/* 마지막 장: 티켓 */
+.ticket { background: #fff; color: var(--navy); border-radius: 40px; display: grid; grid-template-columns: 1fr 290px; position: relative; overflow: hidden; }
+.ticket .l { padding: 46px 50px; display: grid; gap: 10px; }
+.ticket .r { background: var(--hl); display: grid; place-items: center; text-align: center; padding: 30px; border-left: 6px dashed var(--navy); }
+.ticket .k { font-size: 32px; font-weight: 900; color: var(--blue); }
+.ticket .v { font-size: 68px; font-weight: 900; line-height: 1.15; letter-spacing: -0.04em; }
+.ticket .d { font-size: 32px; color: var(--sub); font-weight: 500; }
+.ticket .r b { font-size: 84px; font-weight: 900; line-height: 1; display: block; }
+.ticket .r span { font-size: 34px; font-weight: 900; display: block; margin-top: 6px; }
+.pts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.pts div { border: 2px solid rgba(255,255,255,.18); border-radius: 28px; padding: 26px 20px; display: grid; gap: 6px; text-align: center; }
+.pts b { font-size: 36px; font-weight: 900; }
+.pts span { font-size: 26px; color: rgba(255,255,255,.7); font-weight: 500; }
+</style>
+</head>
+<body>
+<div id="deck"></div>
+<script>
+// ===== 여기만 바꾸면 새 카드뉴스 =====
+var SERIES = '예비고1 가이드';
+var SLIDES = [
+  { type: 'cover', html: `
+    <div class="giant">A</div>
+    <div class="sticker">저장 필수</div>
+    <span class="kicker">예비 고1 학부모님께</span>
+    <h1>중학교 A,<br>고등학교에선<br><span class="hl">몇 등급</span>일까요?</h1>
+    <p class="lead">지금 고1부터 적용되는<br>내신 5등급제, 6장이면 끝나요.</p>
+    <span class="swipe">넘겨서 보기 →</span>` },
+  { html: `
+    <span class="kicker">01 · 차이</span>
+    <h2>중학교는 <span class="hl">점수</span>,<br>고등학교는 <span class="hl">순서</span></h2>
+    <div class="compare">
+      <div class="cmp a"><span class="k">중학교</span><span class="v">90점↑<br>= A</span><span class="d">반 친구 절반이<br>90점을 넘으면<br>절반이 A</span></div>
+      <div class="cmp b"><span class="k">고등학교</span><span class="v">상위 10%<br>= 1등급</span><span class="d">점수가 높아도<br>순서가 밀리면<br>2등급</span></div>
+    </div>
+    <p class="lead">그래서 중학교 A는 흔하고,<br>고등학교 1등급은 드물어요.</p>` },
+  { html: `
+    <span class="kicker">02 · 100명이라면</span>
+    <h2>1등급은 <span class="hl">딱 10명</span></h2>
+    <div class="panel">
+      <div class="waffle">${(function () {
+        var s = ''; for (var i = 0; i < 100; i++) s += '<i class="' + (i < 10 ? 'g1' : i < 34 ? 'g2' : i < 66 ? 'g3' : i < 90 ? 'g4' : 'g5') + '"></i>'; return s;
+      })()}</div>
+      <div class="wlegend" style="margin-top:30px">
+        <div><i class="g1"></i><b>10명</b>1등급</div>
+        <div><i class="g2"></i><b>24명</b>2등급</div>
+        <div><i class="g3"></i><b>32명</b>3등급</div>
+        <div><i class="g4"></i><b>24명</b>4등급</div>
+        <div><i class="g5"></i><b>10명</b>5등급</div>
+      </div>
+    </div>` },
+  { html: `
+    <span class="kicker">03 · 예를 들면</span>
+    <h2>A 받던 100명 중<br><span class="hl">1등급은 30명</span></h2>
+    <div class="funnel">
+      <div class="fn a"><span class="k">중학교 A</span><span class="v">100<small>명</small></span><span class="d">300명 중 (예시)</span></div>
+      <div class="arrow">→</div>
+      <div class="fn b"><span class="k">고1 1등급</span><span class="v">30<small>명</small></span><span class="d">300명의 10%</span></div>
+    </div>
+    <div class="note">⚠&nbsp; 나머지 70명은 2등급부터 시작해요</div>` },
+  { html: `
+    <span class="kicker">04 · 그래서</span>
+    <h2>고1 첫 시험 전에<br>할 일 <span class="hl">3가지</span></h2>
+    <div class="list">
+      <div class="li"><span class="n">1</span><div><b>우리 학교 시험부터 알기</b><span>범위 · 출제 경향 · 서술형 비율</span></div></div>
+      <div class="li"><span class="n">2</span><div><b>교과서와 외부지문 반복</b><span>고등 시험은 외부지문 비중이 커요</span></div></div>
+      <div class="li"><span class="n">3</span><div><b>겨울방학에 1학기 범위 미리</b><span>3월에 시작하면 늦어요</span></div></div>
+    </div>
+    <div class="save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg>저장해 두고 3월 전에 다시 보세요</div>` },
+  { type: 'end', html: `
+    <span class="kicker">안산 선부동 · 썸어스학원</span>
+    <h2>선부고 · 단원고 · 강서고<br><span class="hl">학교별</span> 예비고1반</h2>
+    <div class="ticket">
+      <div class="l"><span class="k">예비고1 설명회</span><span class="v">내신 5등급제,<br>우리 학교는?</span><span class="d">신청은 카카오톡 채널로</span></div>
+      <div class="r"><div><b>12.19</b><span>토요일</span></div></div>
+    </div>
+    <div class="pts">
+      <div><b>학교별 반</b><span>우리 학교 시험만</span></div>
+      <div><b>밤 10시</b><span>자습까지 관리</span></div>
+      <div><b>같은 선생님</b><span>고1부터 쭉</span></div>
+    </div>` }
+];
+// =====================================
+
+var N = SLIDES.length;
+document.getElementById('deck').innerHTML = SLIDES.map(function (s, i) {
+  var prog = ''; for (var k = 0; k < N; k++) prog += '<i class="' + (k <= i ? 'on' : '') + '"></i>';
+  return '<section class="card ' + (s.type || '') + '" style="--n:' + N + '">' +
+    '<div class="top"><div class="prog">' + prog + '</div><div class="bar"><span class="logo"><span class="mark"></span>SUMUS</span><span>' + SERIES + '</span></div></div>' +
+    '<div class="body">' + s.html + '</div>' +
+    '<div class="foot"><span>썸어스학원 · 안산 선부동</span><span>' + (i + 1) + ' / ' + N + '</span></div></section>';
+}).join('');
+</script>
+</body>
+</html>
