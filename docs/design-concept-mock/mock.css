@@ -1,0 +1,28 @@
+/* 시안 공통: 바깥 판과 폰 틀만. 각 방향의 모양은 각 HTML <style>에 있다. */
+@font-face { font-family: "Pretendard"; src: url("fonts/pretendard-mock.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Black Han Sans"; src: url("fonts/blackhansans-mock.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Hahmlet"; src: url("fonts/hahmlet-mock.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body.board { background: #d9d9de; font-family: "Pretendard", system-ui, sans-serif; color: #18181b; padding: 28px 20px 60px; }
+.board > header { max-width: 1260px; margin: 0 auto 22px; }
+.board > header h1 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.board > header p { margin-top: 6px; font-size: 15px; color: #45454d; line-height: 1.55; max-width: 760px; }
+.board > header a { color: inherit; }
+.phones { display: flex; gap: 28px; flex-wrap: wrap; justify-content: center; }
+.shot { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.shot > figcaption { font-size: 14px; font-weight: 700; color: #45454d; }
+.phone { position: relative; width: 390px; height: 844px; overflow: hidden; border-radius: 34px; box-shadow: 0 0 0 10px #111, 0 18px 40px rgba(0,0,0,.25); isolation: isolate; }
+.rules { max-width: 1260px; margin: 40px auto 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.rules section { background: #fff; border-radius: 14px; padding: 18px 20px; }
+.rules h2 { font-size: 16px; font-weight: 800; margin-bottom: 10px; }
+.rules li { font-size: 14px; line-height: 1.6; margin-left: 18px; color: #33333a; }
+.sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.note { max-width: 1260px; margin: 18px auto 0; font-size: 13px; color: #55555d; }
+
+/* ?still: 들어오는 움직임 없이 끝난 화면 (스크린샷용) */
+.still *, .still *::before, .still *::after { animation-delay: -10s !important; animation-duration: .001s !important; animation-iteration-count: 1 !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; transition: none !important; }
+}

@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 B · 코발트 포커스</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+/* ===== 시안 B · 코발트 포커스 — 토큰 ===== */
+.B {
+  --cobalt: #2f45ff;   /* 브랜드 면 · 고른 것 */
+  --night: #0d1240;    /* 글자 · 야차전 바탕 */
+  --white: #ffffff;
+  --ice: #e4e8ff;      /* 연한 면 · 강조 밑줄 */
+  --lemon: #ffe14d;    /* 연속 · 코인 · 보상 숫자만 */
+  --sub: #5c6385;      /* 보조 글자 (흰 바탕에서 5.9:1) */
+  --line: #e3e6f2;
+  --e-enter: cubic-bezier(0,0,.15,1); --e-exp: cubic-bezier(.03,.4,.1,1);
+  background: var(--white); color: var(--night);
+  font-family: "Pretendard", system-ui, sans-serif; font-weight: 500; letter-spacing: -.01em;
+  font-feature-settings: "tnum";
+}
+.B h1, .B h2, .B .big { font-weight: 900; letter-spacing: -.045em; }
+.B .top { position: absolute; left: 0; right: 0; top: 0; height: 60px; padding: 16px 20px 0; display: flex; align-items: center; justify-content: space-between; z-index: 5; }
+.B .chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 99px; font-size: 15px; font-weight: 800; }
+.B .chip img { width: 18px; height: 18px; }
+.B .ava { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+.B .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 82px; padding: 8px 8px 22px; display: flex; justify-content: space-around; background: var(--white); border-top: 1px solid var(--line); z-index: 6; }
+.B .tabs a { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 64px; font-size: 12px; font-weight: 700; color: #9aa0b8; }
+.B .tabs svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.B .tabs a.on { color: var(--cobalt); }
+.B .tabs a.on svg { fill: var(--ice); }
+.B .pill { display: flex; align-items: center; justify-content: center; gap: 8px; height: 60px; border-radius: 99px; font-size: 18px; font-weight: 800; text-decoration: none; transition: transform 120ms var(--e-enter); }
+.B .pill:active { transform: scale(.97); }
+.B .pill.w { background: var(--white); color: var(--cobalt); }
+.B .pill.c { background: var(--cobalt); color: var(--white); }
+
+/* ---------- 홈 ---------- */
+.B .sky { position: absolute; left: 0; right: 0; top: 0; height: 470px; background: var(--cobalt); color: var(--white); }
+.B .sky .chip.y { background: rgba(255,255,255,.14); color: var(--white); }
+.B .sky .ava { background: rgba(255,255,255,.16); color: var(--white); }
+.B .hl { position: absolute; left: 22px; top: 82px; font-size: 36px; line-height: 1.18; animation: b-up 420ms var(--e-exp) both; }
+.B .hl span { color: #aab6ff; }
+.B .hl-sub { position: absolute; left: 22px; top: 180px; font-size: 15px; color: rgba(255,255,255,.78); animation: b-up 420ms 60ms var(--e-exp) both; }
+.B .hl-sub b { color: var(--white); }
+.B .streak { position: absolute; left: 22px; top: 222px; display: flex; gap: 8px; align-items: center; animation: b-up 420ms 120ms var(--e-exp) both; }
+.B .streak .chip { background: var(--lemon); color: var(--night); height: 30px; font-size: 14px; }
+.B .streak small { font-size: 13px; color: rgba(255,255,255,.78); }
+.B .sky .pill { position: absolute; left: 22px; width: 196px; top: 270px; animation: b-up 420ms 180ms var(--e-exp) both; }
+.B .h-pet { position: absolute; right: -44px; top: 196px; width: 280px; z-index: 3; animation: b-pet 520ms 120ms var(--e-exp) both; }
+.B .sheet { position: absolute; left: 0; right: 0; top: 432px; bottom: 0; background: var(--white); border-radius: 28px 28px 0 0; padding: 26px 22px 0; z-index: 2; animation: b-sheet 480ms var(--e-enter) both; }
+.B .wk { display: flex; justify-content: space-between; align-items: flex-end; }
+.B .wk small { display: block; font-size: 14px; color: var(--sub); font-weight: 600; margin-bottom: 4px; }
+.B .wk .big { font-size: 34px; line-height: 1; }
+.B .wk .big em { font-style: normal; font-size: 20px; font-weight: 800; margin-left: 2px; }
+.B .rk { font-size: 15px; font-weight: 800; color: var(--cobalt); letter-spacing: -.02em; margin-left: 8px; vertical-align: 4px; }
+.B .rank { font-size: 14px; color: var(--sub); text-align: right; }
+.B .rank b { display: block; font-size: 22px; font-weight: 900; color: var(--cobalt); }
+.B .days { display: flex; gap: 8px; margin-top: 16px; }
+.B .days div { flex: 1; text-align: center; font-size: 12px; color: var(--sub); font-weight: 700; }
+.B .days i { display: block; height: 34px; border-radius: 10px; background: var(--ice); margin-bottom: 6px; transform-origin: bottom; animation: b-bar 380ms var(--e-exp) both; }
+.B .days i.d { background: var(--cobalt); }
+.B .days i.t { background: var(--white); box-shadow: inset 0 0 0 2px var(--cobalt); }
+.B .rows { margin-top: 18px; }
+.B .row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-top: 1px solid var(--line); }
+.B .row b { font-size: 18px; font-weight: 800; }
+.B .row span { font-size: 14px; color: var(--sub); }
+.B .row span em { font-style: normal; color: var(--cobalt); font-weight: 800; }
+.B .row .ar { color: #b6bbd2; font-size: 20px; margin-left: 8px; }
+
+/* ---------- 공부 ---------- */
+.B .q-top { position: absolute; left: 20px; right: 20px; top: 20px; display: flex; align-items: center; gap: 14px; }
+.B .q-top .x { font-size: 24px; color: var(--sub); }
+.B .bar { flex: 1; height: 8px; border-radius: 99px; background: var(--ice); overflow: hidden; }
+.B .bar i { display: block; height: 100%; width: 100%; border-radius: 99px; background: var(--cobalt); transform-origin: left; transform: scaleX(.35); animation: b-fill 600ms var(--e-exp) both; }
+.B .q-top .n { font-size: 15px; font-weight: 800; }
+.B .q-top .n small { color: var(--sub); font-weight: 600; }
+.B .kind { position: absolute; left: 22px; top: 70px; padding: 5px 10px; border-radius: 8px; background: var(--ice); color: var(--cobalt); font-size: 13px; font-weight: 800; }
+.B .word { position: absolute; left: 22px; top: 108px; font-size: 48px; font-weight: 900; letter-spacing: -.03em; }
+.B .ph { position: absolute; left: 24px; top: 170px; display: flex; gap: 8px; align-items: center; font-size: 15px; color: var(--sub); }
+.B .ph .spk { width: 30px; height: 30px; border-radius: 50%; background: var(--ice); display: grid; place-items: center; color: var(--cobalt); font-size: 14px; }
+.B .ex { position: absolute; left: 22px; right: 22px; top: 214px; font-size: 17px; line-height: 1.6; }
+.B .ex u { text-decoration: none; padding: 1px 6px; border-radius: 6px; background: var(--ice); color: var(--cobalt); font-weight: 800; }
+.B .opts { position: absolute; left: 20px; right: 20px; top: 296px; display: grid; gap: 10px; }
+.B .opt { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; height: 60px; padding: 0 18px; border-radius: 16px; box-shadow: inset 0 0 0 1.5px var(--line); font-size: 17px; font-weight: 700; }
+.B .opt.dim { color: #a3a8c0; }
+.B .opt.ok { color: var(--white); box-shadow: none; }
+.B .opt.ok::before { content: ""; position: absolute; inset: 0; background: var(--cobalt); transform-origin: left; animation: b-fill 280ms var(--e-enter) both; z-index: -1; }
+.B .opt.ok { isolation: isolate; }
+.B .opt .ck { width: 26px; height: 26px; border-radius: 50%; background: var(--white); color: var(--cobalt); display: grid; place-items: center; font-size: 15px; font-weight: 900; animation: b-pop 300ms 200ms cubic-bezier(.3,1.6,.5,1) both; }
+.B .plus { position: absolute; right: 56px; top: 22px; line-height: 1; font-size: 16px; font-weight: 900; color: var(--lemon); animation: b-float 700ms 240ms var(--e-exp) both; }
+.B .q-pet { position: absolute; left: 18px; bottom: 166px; width: 96px; height: 96px; border-radius: 50%; background: var(--ice); overflow: hidden; animation: b-pop 340ms 260ms cubic-bezier(.3,1.6,.5,1) both; }
+.B .q-pet img { width: 118px; margin: -4px 0 0 -11px; }
+.B .say { position: absolute; left: 124px; bottom: 214px; font-size: 20px; font-weight: 900; letter-spacing: -.04em; animation: b-up 360ms 320ms var(--e-exp) both; }
+.B .say small { display: block; margin-top: 2px; font-size: 14px; font-weight: 600; color: var(--sub); letter-spacing: 0; }
+.B .q-next { position: absolute; left: 20px; right: 20px; bottom: 96px; }
+
+/* ---------- 야차전 ---------- */
+.B.night { background: var(--night); color: var(--white); }
+.B.night .tabs { background: var(--night); border-top-color: rgba(255,255,255,.1); }
+.B.night .tabs a { color: #6f76a8; }
+.B.night .tabs a.on { color: var(--white); }
+.B.night .tabs a.on svg { fill: rgba(255,255,255,.12); }
+.B .y-h { position: absolute; left: 22px; top: 64px; font-size: 32px; }
+.B .seg { position: absolute; left: 20px; right: 20px; top: 116px; display: flex; padding: 4px; border-radius: 14px; background: rgba(255,255,255,.08); }
+.B .seg a { flex: 1; text-align: center; padding: 9px 0; border-radius: 10px; font-size: 15px; font-weight: 700; color: #9aa1d3; }
+.B .seg a.on { background: var(--white); color: var(--night); }
+.B .duel { position: absolute; left: 0; right: 0; top: 176px; height: 250px; }
+.B .duel .glow { position: absolute; left: 30px; top: 30px; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(47,69,255,.75), rgba(47,69,255,0) 70%); }
+.B .duel .mine { position: absolute; left: -8px; top: 4px; width: 236px; animation: b-pet 520ms var(--e-exp) both; }
+.B .duel .them { position: absolute; right: 10px; top: 54px; width: 150px; height: 150px; border-radius: 50%; border: 2px dashed rgba(255,255,255,.28); display: grid; place-items: center; font-size: 54px; font-weight: 900; color: rgba(255,255,255,.5); }
+.B .duel .vs { position: absolute; left: 50%; top: 112px; transform: translateX(-10%); font-size: 15px; font-weight: 900; letter-spacing: .1em; color: #9aa1d3; }
+.B .duel .lbl { position: absolute; bottom: 0; font-size: 13px; color: #9aa1d3; }
+.B .duel .lbl b { display: block; font-size: 20px; font-weight: 900; color: var(--white); letter-spacing: -.03em; }
+.B .duel .lbl.l { left: 26px; }
+.B .duel .lbl.r { right: 26px; text-align: right; }
+.B .stat3 { position: absolute; left: 22px; right: 22px; top: 448px; display: flex; justify-content: space-between; padding: 14px 0; border-top: 1px solid rgba(255,255,255,.1); border-bottom: 1px solid rgba(255,255,255,.1); }
+.B .stat3 div { font-size: 13px; color: #9aa1d3; }
+.B .stat3 b { display: block; font-size: 22px; font-weight: 900; color: var(--white); }
+.B .stat3 b.y { color: var(--lemon); }
+.B .opts2 { position: absolute; left: 22px; right: 22px; top: 538px; display: grid; gap: 14px; }
+.B .o2 { display: flex; align-items: center; justify-content: space-between; }
+.B .o2 > span { font-size: 15px; color: #9aa1d3; font-weight: 600; }
+.B .o2 .ch { display: flex; gap: 6px; }
+.B .o2 .ch a { padding: 8px 14px; border-radius: 99px; font-size: 15px; font-weight: 800; color: #c6cbef; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.16); }
+.B .o2 .ch a.on { background: var(--cobalt); color: var(--white); box-shadow: none; }
+.B .o2 .rng { font-size: 16px; font-weight: 800; }
+.B .o2 .rng small { color: #9aa1d3; font-weight: 600; margin-left: 6px; }
+.B .y-cta { position: absolute; left: 20px; right: 20px; bottom: 98px; }
+
+@keyframes b-up { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes b-sheet { from { transform: translateY(80px); } to { transform: none; } }
+@keyframes b-pet { from { transform: translateY(40px) scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes b-bar { from { transform: scaleY(.2); } to { transform: none; } }
+@keyframes b-fill { from { transform: scaleX(0); } }
+@keyframes b-pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes b-float { 0% { transform: translateY(10px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(-18px); opacity: 1; } }
+</style>
+</head>
+<body class="board">
+<header>
+  <h1>시안 B · 코발트 포커스</h1>
+  <p>화면 위쪽을 진한 파랑으로 채우고, 흰 큰 글자로 "오늘 할 일"을 문장 하나로 말합니다. 공부 화면은 흰 바탕에 문제만. 국내 1위 영어 앱들이 쓰는 "공부 앱인데 세련됨" 쪽입니다. <a href="index.html">← 시안 목록</a></p>
+</header>
+<div class="phones">
+  <figure class="shot"><figcaption>홈</figcaption>
+  <div class="phone B" data-screen="home">
+    <div class="sky">
+      <div class="top"><span class="chip y"><img src="../../public/assets/ui/coin.webp" alt="">890</span><span class="ava">나</span></div>
+      <h1 class="hl">오늘 20단어면<br><span>청룡이 진화해요</span></h1>
+      <p class="hl-sub">진화까지 <b>150</b> 경험치 · 고1A 단원고</p>
+      <div class="streak"><span class="chip">12일 연속</span><small>오늘 하면 13일</small></div>
+      <a class="pill w" href="#">20단어 시작</a>
+    </div>
+    <img class="h-pet" src="../../public/assets/pets/cheongryong-3.webp" alt="">
+    <div class="sheet">
+      <div class="wk"><div><small>이번 주 맞힌 단어</small><div class="big">90<em>개</em> <span class="rk">고1 경험치 3위</span></div></div></div>
+      <div class="days">
+        <div><i class="d" style="animation-delay:60ms"></i>월</div><div><i class="d" style="animation-delay:100ms"></i>화</div><div><i class="d" style="animation-delay:140ms"></i>수</div><div><i class="d" style="animation-delay:180ms"></i>목</div><div><i class="d" style="animation-delay:220ms"></i>금</div><div><i class="t" style="animation-delay:260ms"></i>토</div><div><i style="animation-delay:300ms"></i>일</div>
+      </div>
+      <div class="rows">
+        <div class="row"><b>야차전</b><span>친구 <em>3명</em>이 기다려요<span class="ar">›</span></span></div>
+        <div class="row"><b>놀이터</b><span>오늘 <em>33판</em> 남았어요<span class="ar">›</span></span></div>
+      </div>
+    </div>
+    <nav class="tabs">
+      <a class="on"><svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H4z"/></svg>홈</a>
+      <a><svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg>학습</a>
+      <a><svg viewBox="0 0 24 24"><path d="M5 19 19 5M14 5h5v5M5 5l5 5M14 14l5 5"/></svg>야차전</a>
+      <a><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="4"/><path d="M8 11v3M6.5 12.5h3M15 12h.01M17 14h.01"/></svg>놀이터</a>
+      <a><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-5 8-5s6.5 1 8 5"/></svg>나</a>
+    </nav>
+  </div></figure>
+
+  <figure class="shot"><figcaption>단어 공부 (정답 직후)</figcaption>
+  <div class="phone B" data-screen="study">
+    <div class="q-top"><span class="x">×</span><div class="bar"><i></i></div><span class="n">7 <small>/ 20</small></span></div>
+    <span class="kind">뜻 고르기</span>
+    <div class="word">cultivate</div>
+    <div class="ph">/ˈkʌltɪveɪt/ <span class="spk">♪</span></div>
+    <p class="ex">She <u>cultivates</u> tomatoes in her small garden.</p>
+    <div class="opts">
+      <div class="opt dim">수확하다</div>
+      <div class="opt ok">재배하다, 기르다<span class="plus">+10</span><span class="ck">✓</span></div>
+      <div class="opt dim">보존하다</div>
+      <div class="opt dim">개척하다</div>
+    </div>
+    <div class="q-pet"><img src="../../public/assets/pets/cheongryong-3-happy.webp" alt=""></div>
+    <div class="say">6개 연속 정답<small>청룡 경험치 +10 · 남은 문제 13개</small></div>
+    <div class="q-next"><a class="pill c" href="#">다음</a></div>
+    <nav class="tabs">
+      <a><svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H4z"/></svg>홈</a>
+      <a class="on"><svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg>학습</a>
+      <a><svg viewBox="0 0 24 24"><path d="M5 19 19 5M14 5h5v5M5 5l5 5M14 14l5 5"/></svg>야차전</a>
+      <a><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="4"/><path d="M8 11v3M6.5 12.5h3M15 12h.01M17 14h.01"/></svg>놀이터</a>
+      <a><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-5 8-5s6.5 1 8 5"/></svg>나</a>
+    </nav>
+  </div></figure>
+
+  <figure class="shot"><figcaption>야차전 · 대결 준비</figcaption>
+  <div class="phone B night" data-screen="yacha">
+    <div class="top"><span class="chip" style="background:rgba(255,255,255,.1);color:#fff"><img src="../../public/assets/ui/coin.webp" alt="">890</span><span class="ava" style="background:rgba(255,255,255,.12);color:#fff">나</span></div>
+    <h2 class="y-h">야차전</h2>
+    <nav class="seg"><a class="on">대결</a><a>몬스터</a><a>던전</a><a>기록</a></nav>
+    <div class="duel">
+      <div class="glow"></div>
+      <img class="mine" src="../../public/assets/pets/cheongryong-3.webp" alt="">
+      <div class="them">?</div>
+      <div class="lbl l">나<b>청룡 Lv.3</b></div>
+      <div class="lbl r">상대<b>친구 고르기</b></div>
+    </div>
+    <div class="stat3"><div>이번 주<b>4승 2패</b></div><div>리그<b>브론즈</b></div><div>이기면<b class="y">+30</b></div></div>
+    <div class="opts2">
+      <div class="o2"><span>방식</span><div class="ch"><a class="on">스피드</a><a>실력</a></div></div>
+      <div class="o2"><span>단어</span><span class="rng">3·4과<small>268단어 ›</small></span></div>
+      <div class="o2"><span>판돈</span><div class="ch"><a>10</a><a class="on">30</a><a>50</a></div></div>
+    </div>
+    <div class="y-cta"><a class="pill w" href="#">도전장 보내기</a></div>
+    <nav class="tabs">
+      <a><svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H4z"/></svg>홈</a>
+      <a><svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg>학습</a>
+      <a class="on"><svg viewBox="0 0 24 24"><path d="M5 19 19 5M14 5h5v5M5 5l5 5M14 14l5 5"/></svg>야차전</a>
+      <a><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="4"/><path d="M8 11v3M6.5 12.5h3M15 12h.01M17 14h.01"/></svg>놀이터</a>
+      <a><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-5 8-5s6.5 1 8 5"/></svg>나</a>
+    </nav>
+  </div></figure>
+</div>
+
+<div class="rules">
+  <section><h2>색 5개</h2><ul>
+    <li><span class="sw" style="background:#2f45ff"></span>코발트 #2f45ff 홈 위쪽 면 · 고른 것 · 공부 화면 주 버튼</li>
+    <li><span class="sw" style="background:#0d1240"></span>밤 #0d1240 글자 · 야차전 바탕</li>
+    <li><span class="sw" style="background:#ffffff"></span>흰 #ffffff 바탕 · 파랑 위 주 버튼</li>
+    <li><span class="sw" style="background:#e4e8ff"></span>얼음 #e4e8ff 연한 면 · 단어 강조</li>
+    <li><span class="sw" style="background:#ffe14d"></span>레몬 #ffe14d 연속 · 보상 숫자만</li>
+  </ul></section>
+  <section><h2>글꼴 1개</h2><ul>
+    <li>Pretendard 가변 하나로 제목 900 · 본문 500~800 (SIL OFL 1.1)</li>
+    <li>제목은 자간 −4.5%로 조여 "크고 단단하게"</li>
+    <li>글자 단계: 12 · 14 · 17 · 22 · 34 · 48</li>
+  </ul></section>
+  <section><h2>모양 · 움직임</h2><ul>
+    <li>둥근 정도 3가지: 10 · 16 · 알약. 그림자 없음, 카드 없음(구역은 줄과 면 색)</li>
+    <li>주 버튼은 알약 60px 하나, 누르면 97%</li>
+    <li>홈은 흰 판이 아래에서 올라오고(480ms), 정답 줄은 왼쪽부터 파랑으로 채워짐(280ms)</li>
+    <li>곡선: 들어옴 cubic-bezier(0,0,.15,1), 강조 (.03,.4,.1,1) — SEED 디자인 값</li>
+  </ul></section>
+  <section><h2>말투</h2><ul>
+    <li>해요체 한 문장: "오늘 20단어면 청룡이 진화해요", "친구 3명이 기다려요"</li>
+    <li>숫자는 굵게, 설명은 회색 한 줄까지만</li>
+  </ul></section>
+</div>
+<p class="note">숫자 · 이름은 예시입니다. 그림은 모두 저장소의 것입니다(public/assets).</p>
+<script>if (location.search.includes('still')) document.body.classList.add('still');</script>
+</body>
+</html>

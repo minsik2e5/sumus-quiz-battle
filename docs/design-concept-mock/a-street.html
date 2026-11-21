@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 A · 스트릿 HUD</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+/* ===== 시안 A · 스트릿 HUD — 토큰 ===== */
+.A {
+  --ink: #0e0e11;      /* 바탕 */
+  --panel: #1b1b20;    /* 면 */
+  --chalk: #f2f0ea;    /* 글자 */
+  --red: #ff4655;      /* 행동(가장 큰 버튼, 고른 것) — 한 화면에 한 곳 */
+  --volt: #f5e663;     /* 보상 · 콤보 · 정답 — 숫자에만 */
+  --dim: #8d8d96;      /* 보조 글자 */
+  --line: rgba(242,240,234,.16);
+  --skew: -12deg;
+  --t-snap: 140ms; --e-snap: cubic-bezier(.2,0,0,1);
+  --t-in: 260ms;   --e-in: cubic-bezier(.03,.4,.1,1);
+  background: var(--ink); color: var(--chalk);
+  font-family: "Pretendard", system-ui, sans-serif; font-weight: 500;
+}
+.A .disp { font-family: "Black Han Sans", "Pretendard", sans-serif; font-weight: 400; letter-spacing: -.01em; }
+.A .hud { position: absolute; top: 0; left: 0; right: 0; height: 58px; padding: 16px 18px 0; display: flex; align-items: center; justify-content: space-between; z-index: 5; font-size: 13px; color: var(--dim); }
+.A .hud b { color: var(--chalk); font-weight: 700; }
+.A .coin { display: flex; align-items: center; gap: 6px; font-size: 18px; color: var(--chalk); }
+.A .coin img { width: 20px; height: 20px; }
+.A .me { width: 34px; height: 34px; border: 1.5px solid var(--line); display: grid; place-items: center; font-weight: 700; color: var(--chalk); transform: skewX(var(--skew)); }
+.A .me span { transform: skewX(12deg); }
+.A .hud-r { display: flex; gap: 14px; align-items: center; }
+
+/* 탭 바: 글자만, 고른 탭 아래 빨간 기울어진 막대 */
+.A .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 78px; padding: 0 10px 18px; display: flex; align-items: center; justify-content: space-around; background: var(--ink); border-top: 1px solid var(--line); z-index: 6; }
+.A .tabs a { position: relative; font-size: 14px; font-weight: 700; color: var(--dim); text-decoration: none; padding: 14px 6px; }
+.A .tabs a.on { color: var(--chalk); }
+.A .tabs a.on::after { content: ""; position: absolute; left: 2px; right: 2px; bottom: 6px; height: 4px; background: var(--red); transform: skewX(var(--skew)); }
+
+/* 가장 큰 버튼: 평행사변형, 누르면 2px 밀림 + 흰빛 80ms */
+.A .go { position: relative; display: flex; align-items: center; justify-content: space-between; height: 66px; padding: 0 26px; background: var(--red); color: var(--ink); border: 0; transform: skewX(var(--skew)); font-family: "Black Han Sans", sans-serif; font-size: 24px; text-decoration: none; transition: transform var(--t-snap) var(--e-snap); }
+.A .go > * { transform: skewX(12deg); }
+.A .go small { font-family: "Pretendard", sans-serif; font-weight: 800; font-size: 15px; }
+.A .go:active { transform: skewX(var(--skew)) translate(2px, 2px); }
+.A .go::before { content: ""; position: absolute; inset: 0; background: #fff; opacity: 0; transition: opacity 80ms; }
+.A .go:active::before { opacity: .5; }
+
+.A .tag { display: inline-block; padding: 4px 10px; font-size: 12px; font-weight: 800; transform: skewX(var(--skew)); }
+.A .tag > span { display: inline-block; transform: skewX(12deg); }
+
+/* ---------- 홈 ---------- */
+.A .h-bignum { position: absolute; right: -24px; top: 54px; font-size: 300px; line-height: .8; color: transparent; -webkit-text-stroke: 1.5px rgba(242,240,234,.12); transform: skewX(var(--skew)); z-index: 0; }
+.A .h-pet { position: absolute; right: -58px; top: 66px; width: 316px; z-index: 1; animation: a-slide var(--t-in) var(--e-in) both; }
+.A .h-slash { position: absolute; left: -40px; right: -40px; top: 360px; height: 120px; background: var(--panel); transform: skewY(-8deg); z-index: 0; }
+.A .h-name { position: absolute; left: 20px; top: 92px; z-index: 2; width: 200px; }
+.A .h-name .tag { background: var(--volt); color: var(--ink); }
+.A .h-name h2 { margin-top: 12px; font-size: 50px; line-height: .98; transform: skewX(-6deg); transform-origin: left; animation: a-type var(--t-in) 60ms var(--e-in) both; }
+.A .h-name p { margin-top: 12px; font-size: 14px; color: var(--dim); }
+.A .h-name p b { color: var(--chalk); }
+.A .xp { margin-top: 10px; display: flex; gap: 4px; }
+.A .xp i { width: 16px; height: 8px; background: rgba(242,240,234,.18); transform: skewX(var(--skew)); }
+.A .xp i.f { background: var(--volt); }
+.A .h-stats { position: absolute; left: 20px; right: 20px; top: 402px; z-index: 2; display: flex; align-items: flex-end; gap: 18px; }
+.A .stat .n { font-size: 46px; line-height: 1; }
+.A .stat .n em { font-style: normal; font-size: 22px; margin-left: 2px; }
+.A .stat .l { margin-top: 6px; font-size: 13px; color: var(--dim); }
+.A .stat.v .n { color: var(--volt); }
+.A .h-stats .sl { width: 2px; height: 50px; background: var(--line); transform: skewX(var(--skew)); }
+.A .h-cta { position: absolute; left: 22px; right: 22px; top: 512px; z-index: 2; }
+.A .h-cta p { margin-top: 10px; font-size: 13px; color: var(--dim); padding-left: 6px; }
+.A .h-cta p b { color: var(--volt); }
+.A .menu { position: absolute; left: 20px; right: 20px; top: 618px; z-index: 2; }
+.A .menu a { display: grid; grid-template-columns: 34px 1fr auto; align-items: baseline; gap: 6px; padding: 11px 0; border-top: 1px solid var(--line); color: var(--chalk); text-decoration: none; }
+.A .menu a:last-child { border-bottom: 1px solid var(--line); }
+.A .menu .k { font-size: 15px; color: var(--dim); }
+.A .menu .t { font-size: 22px; }
+.A .menu .s { font-size: 13px; color: var(--dim); }
+.A .menu .s b { color: var(--chalk); }
+
+/* ---------- 공부 ---------- */
+.A .q-top { position: absolute; top: 18px; left: 18px; right: 18px; display: flex; align-items: center; gap: 12px; }
+.A .x { width: 34px; height: 34px; display: grid; place-items: center; color: var(--dim); font-size: 22px; }
+.A .seg { flex: 1; display: flex; gap: 3px; }
+.A .seg i { flex: 1; height: 10px; background: rgba(242,240,234,.14); transform: skewX(var(--skew)); }
+.A .seg i.f { background: var(--chalk); }
+.A .seg i.now { background: var(--volt); }
+.A .q-count { font-size: 20px; }
+.A .combo { position: absolute; right: 18px; top: 66px; background: var(--volt); color: var(--ink); padding: 6px 14px; font-size: 20px; animation: a-pop 360ms 520ms cubic-bezier(.3,1.6,.5,1) both; }
+.A .q-kind { position: absolute; left: 22px; top: 74px; font-size: 13px; font-weight: 800; color: var(--red); letter-spacing: .02em; }
+.A .q-word { position: absolute; left: 20px; right: 20px; top: 100px; font-size: 64px; line-height: 1; transform: skewX(-6deg); transform-origin: left; }
+.A .q-ph { position: absolute; left: 22px; top: 178px; display: flex; gap: 10px; align-items: center; font-size: 15px; color: var(--dim); }
+.A .spk { width: 30px; height: 30px; border: 1.5px solid var(--line); display: grid; place-items: center; transform: skewX(var(--skew)); }
+.A .q-ex { position: absolute; left: 22px; right: 22px; top: 222px; font-size: 16px; line-height: 1.55; color: #c9c7c0; }
+.A .q-ex u { text-decoration: none; color: var(--chalk); box-shadow: inset 0 -6px 0 rgba(245,230,99,.45); }
+.A .opts { position: absolute; left: 26px; right: 26px; top: 286px; display: grid; gap: 10px; }
+.A .opt { position: relative; display: flex; align-items: center; gap: 16px; height: 58px; padding: 0 18px; border: 1.5px solid var(--line); transform: skewX(var(--skew)); font-size: 18px; font-weight: 700; color: var(--chalk); background: transparent; }
+.A .opt > * { transform: skewX(12deg); }
+.A .opt .no { width: 28px; font-family: "Black Han Sans"; font-size: 18px; color: var(--dim); }
+.A .opt.dim { opacity: .38; }
+.A .opt.ok { background: var(--volt); border-color: var(--volt); color: var(--ink); animation: a-hit 260ms var(--e-snap) both; }
+.A .opt.ok .no { color: var(--ink); }
+.A .stamp { position: absolute; right: 12px; top: -16px; padding: 4px 10px; border: 2.5px solid var(--ink); background: var(--volt); font-family: "Black Han Sans"; font-size: 18px; color: var(--ink); transform: skewX(12deg) rotate(-8deg); animation: a-stamp 300ms 140ms cubic-bezier(.3,1.6,.5,1) both; }
+.A .spark { position: absolute; width: 18px; height: 4px; background: var(--volt); top: 372px; left: 318px; opacity: 0; animation: a-spark 420ms 160ms var(--e-in) both; }
+.A .q-pet { position: absolute; left: -22px; bottom: 92px; width: 150px; transform: scaleX(-1); animation: a-peek 320ms 300ms var(--e-in) both; }
+.A .q-say { position: absolute; left: 104px; bottom: 206px; background: var(--chalk); color: var(--ink); font-size: 14px; font-weight: 800; padding: 8px 12px; transform: skewX(var(--skew)); animation: a-pop 260ms 460ms cubic-bezier(.3,1.6,.5,1) both; }
+.A .q-say span { display: inline-block; transform: skewX(12deg); }
+.A .q-next { position: absolute; left: 150px; right: 22px; bottom: 106px; }
+.A .q-next .go { height: 58px; font-size: 22px; }
+.A .q-gain { position: absolute; left: 160px; bottom: 176px; font-size: 14px; color: var(--dim); }
+.A .q-gain b { color: var(--volt); }
+
+/* ---------- 야차전 ---------- */
+.A .y-h { position: absolute; left: 20px; top: 62px; font-size: 40px; transform: skewX(-6deg); transform-origin: left; }
+.A .y-tabs { position: absolute; left: 20px; right: 20px; top: 118px; display: flex; gap: 22px; border-bottom: 1px solid var(--line); }
+.A .y-tabs a { position: relative; padding: 10px 0 12px; font-size: 16px; font-weight: 700; color: var(--dim); }
+.A .y-tabs a.on { color: var(--chalk); }
+.A .y-tabs a.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 4px; background: var(--red); transform: skewX(var(--skew)); }
+.A .vs { position: absolute; left: 0; right: 0; top: 168px; height: 250px; }
+.A .vs .sme, .A .vs .sop { position: absolute; top: 0; bottom: 0; width: 100%; }
+.A .vs .sme { background: var(--panel); clip-path: polygon(0 0, 58% 0, 42% 100%, 0 100%); }
+.A .vs .sop { background: #2a1216; clip-path: polygon(58% 0, 100% 0, 100% 100%, 42% 100%); }
+.A .vs .sme img { position: absolute; left: -30px; top: -6px; width: 236px; animation: a-slide var(--t-in) var(--e-in) both; }
+.A .vs .sop .sil { position: absolute; right: -10px; top: 10px; width: 240px; filter: brightness(0); opacity: .9; transform: scaleX(-1); animation: a-slide-r var(--t-in) 80ms var(--e-in) both; }
+.A .vs .cut { position: absolute; left: 50%; top: -10px; bottom: -10px; width: 4px; background: var(--volt); transform: translateX(-50%) rotate(14deg) scaleY(1); transform-origin: top; animation: a-cut 240ms 220ms var(--e-snap) both; }
+.A .vs .vsw { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%) skewX(var(--skew)); font-size: 56px; color: var(--volt); -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; animation: a-pop 300ms 360ms cubic-bezier(.3,1.6,.5,1) both; }
+.A .vs .nm { position: absolute; bottom: 12px; z-index: 2; padding: 6px 10px 7px; background: var(--ink); font-size: 12px; color: var(--dim); }
+.A .vs .nm b { display: block; font-family: "Black Han Sans"; font-size: 22px; color: var(--chalk); font-weight: 400; }
+.A .vs .sme .nm { left: 20px; }
+.A .vs .sop .nm { right: 20px; text-align: right; }
+.A .vs .sop .q { position: absolute; right: 86px; top: 70px; font-family: "Black Han Sans"; font-size: 80px; color: var(--red); }
+.A .rec { position: absolute; left: 20px; right: 20px; top: 428px; display: flex; justify-content: space-between; font-size: 13px; color: var(--dim); }
+.A .rec b { color: var(--chalk); font-weight: 700; }
+/* 기술 버튼처럼 쌓은 설정 줄 */
+.A .moves { position: absolute; left: 26px; right: 26px; top: 462px; display: grid; gap: 9px; }
+.A .mv { display: grid; grid-template-columns: 56px 1fr; align-items: center; height: 50px; border: 1.5px solid var(--line); transform: skewX(var(--skew)); }
+.A .mv > * { transform: skewX(12deg); }
+.A .mv .k { padding-left: 14px; font-size: 13px; color: var(--dim); font-weight: 700; }
+.A .mv .ch { display: flex; gap: 6px; padding-right: 8px; justify-content: flex-end; align-items: center; }
+.A .ch span { padding: 6px 12px; font-size: 15px; font-weight: 700; color: var(--dim); }
+.A .ch span.on { background: var(--chalk); color: var(--ink); }
+.A .ch .rng { font-size: 15px; font-weight: 700; color: var(--chalk); }
+.A .ch .rng small { color: var(--dim); font-weight: 500; margin-left: 6px; }
+.A .y-cta { position: absolute; left: 24px; right: 24px; bottom: 98px; }
+
+@keyframes a-slide { from { transform: translateX(-40px) skewX(-10deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes a-slide-r { from { transform: scaleX(-1) translateX(-40px); opacity: 0; } to { transform: scaleX(-1); opacity: .9; } }
+@keyframes a-type { from { transform: skewX(-6deg) translateX(-24px); opacity: 0; } to { transform: skewX(-6deg); opacity: 1; } }
+@keyframes a-pop { from { transform: skewX(var(--skew)) scale(1.5); opacity: 0; } to { transform: skewX(var(--skew)) scale(1); opacity: 1; } }
+@keyframes a-hit { 0% { transform: skewX(var(--skew)) translateX(0); } 40% { transform: skewX(var(--skew)) translateX(8px); } 100% { transform: skewX(var(--skew)); } }
+@keyframes a-stamp { from { transform: skewX(12deg) rotate(-8deg) scale(2.2); opacity: 0; } to { transform: skewX(12deg) rotate(-8deg) scale(1); opacity: 1; } }
+@keyframes a-spark { 0% { opacity: 1; transform: rotate(var(--r)) translateX(0); } 100% { opacity: 0; transform: rotate(var(--r)) translateX(46px); } }
+@keyframes a-peek { from { transform: scaleX(-1) translateY(60px); opacity: 0; } to { transform: scaleX(-1); opacity: 1; } }
+@keyframes a-cut { from { transform: translateX(-50%) rotate(14deg) scaleY(0); } to { transform: translateX(-50%) rotate(14deg) scaleY(1); } }
+</style>
+</head>
+<body class="board">
+<header>
+  <h1>시안 A · 스트릿 HUD</h1>
+  <p>검은 바탕에 빨강 한 색, 기울어진 굵은 글자. 대전 게임 화면처럼 "지금 할 것 하나"만 크게. 펫은 틀 안에 가두지 않고 화면 밖으로 넘칩니다. <a href="index.html">← 시안 목록</a></p>
+</header>
+<div class="phones">
+  <!-- 홈 -->
+  <figure class="shot"><figcaption>홈</figcaption>
+  <div class="phone A" data-screen="home">
+    <div class="hud"><span>단원고 <b>1-A</b></span><span class="hud-r"><span class="coin disp"><img src="../../public/assets/ui/coin.webp" alt="">890</span><span class="me"><span>나</span></span></span></div>
+    <div class="h-bignum disp">03</div>
+    <div class="h-slash"></div>
+    <img class="h-pet" src="../../public/assets/pets/gumiho-3.webp" alt="">
+    <div class="h-name">
+      <span class="tag"><span>전설 · 3단계</span></span>
+      <h2 class="disp">구미호<br>루나</h2>
+      <p>레벨 <b>3</b> · 다음 진화까지 <b>150</b></p>
+      <div class="xp"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div class="h-stats">
+      <div class="stat"><div class="n disp">90</div><div class="l">이번 주 맞힌 단어</div></div>
+      <div class="sl"></div>
+      <div class="stat v"><div class="n disp">12<em>일</em></div><div class="l">연속 공부</div></div>
+    </div>
+    <div class="h-cta">
+      <a class="go" href="#"><span>오늘 단어 시작</span><small>20개 ▶</small></a>
+      <p>오늘 하면 <b>13일 연속</b> · 진화까지 이틀</p>
+    </div>
+    <nav class="menu">
+      <a href="#"><span class="k disp">02</span><span class="t disp">야차전</span><span class="s"><b>3명</b> 도전 대기</span></a>
+      <a href="#"><span class="k disp">03</span><span class="t disp">놀이터</span><span class="s">오늘 <b>33판</b> 남음</span></a>
+      <a href="#"><span class="k disp">04</span><span class="t disp">도감</span><span class="s"><b>22</b> / 94</span></a>
+    </nav>
+    <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+
+  <!-- 공부 -->
+  <figure class="shot"><figcaption>단어 공부 (정답 직후)</figcaption>
+  <div class="phone A" data-screen="study">
+    <div class="q-top"><span class="x">×</span><div class="seg"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="now"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="q-count disp">07/20</span></div>
+    <div class="q-kind">뜻 고르기 · 3과</div>
+    <div class="combo tag disp"><span>콤보 6</span></div>
+    <div class="q-word disp">cultivate</div>
+    <div class="q-ph">/ˈkʌltɪveɪt/ <span class="spk">♪</span></div>
+    <p class="q-ex">She <u>cultivates</u> tomatoes in her small garden.</p>
+    <div class="opts">
+      <div class="opt dim"><span class="no">1</span><span>수확하다</span></div>
+      <div class="opt ok"><span class="no">2</span><span>재배하다, 기르다</span><span class="stamp">정답</span></div>
+      <div class="opt dim"><span class="no">3</span><span>보존하다</span></div>
+      <div class="opt dim"><span class="no">4</span><span>개척하다</span></div>
+    </div>
+    <i class="spark" style="--r:-30deg"></i><i class="spark" style="--r:10deg"></i><i class="spark" style="--r:50deg"></i><i class="spark" style="--r:-70deg"></i>
+    <img class="q-pet" src="../../public/assets/pets/gumiho-3-cheer.webp" alt="">
+    <div class="q-say"><span>6연속!</span></div>
+    <div class="q-gain">경험치 <b>+10</b> · 루나</div>
+    <div class="q-next"><a class="go" href="#"><span>다음</span><small>▶</small></a></div>
+    <nav class="tabs"><a>홈</a><a class="on">학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+
+  <!-- 야차전 -->
+  <figure class="shot"><figcaption>야차전 · 대결 준비</figcaption>
+  <div class="phone A" data-screen="yacha">
+    <div class="hud"><span>브론즈 리그</span><span class="hud-r"><span class="coin disp"><img src="../../public/assets/ui/coin.webp" alt="">890</span><span class="me"><span>나</span></span></span></div>
+    <h2 class="y-h disp">야차전</h2>
+    <nav class="y-tabs"><a class="on">대결</a><a>몬스터</a><a>던전</a><a>기록</a></nav>
+    <div class="vs">
+      <div class="sme"><img src="../../public/assets/pets/gumiho-3.webp" alt=""><div class="nm">나<b>루나 Lv.3</b></div></div>
+      <div class="sop"><img class="sil" src="../../public/assets/pets/phoenix-3.webp" alt=""><span class="q">?</span><div class="nm">상대<b>친구 번호</b></div></div>
+      <div class="cut"></div>
+      <div class="vsw disp">VS</div>
+    </div>
+    <div class="rec"><span>이번 주 <b>4승 2패</b></span><span>이기면 <b>+30</b> · 지면 <b>−30</b></span></div>
+    <div class="moves">
+      <div class="mv"><span class="k">방식</span><span class="ch"><span class="on">스피드</span><span>실력</span></span></div>
+      <div class="mv"><span class="k">단어</span><span class="ch"><span class="rng">3·4과<small>268단어 ›</small></span></span></div>
+      <div class="mv"><span class="k">판돈</span><span class="ch"><span>10</span><span class="on">30</span><span>50</span></span></div>
+    </div>
+    <div class="y-cta"><a class="go" href="#"><span>도전장 보내기</span><small>▶</small></a></div>
+    <nav class="tabs"><a>홈</a><a>학습</a><a class="on">야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+</div>
+
+<div class="rules">
+  <section><h2>색 5개</h2><ul>
+    <li><span class="sw" style="background:#0e0e11"></span>먹 #0e0e11 바탕</li>
+    <li><span class="sw" style="background:#1b1b20"></span>숯 #1b1b20 면(사선 띠)</li>
+    <li><span class="sw" style="background:#f2f0ea"></span>분필 #f2f0ea 글자</li>
+    <li><span class="sw" style="background:#ff4655"></span>신호 빨강 #ff4655 가장 큰 버튼 · 고른 탭 (한 화면 한 곳)</li>
+    <li><span class="sw" style="background:#f5e663"></span>볼트 노랑 #f5e663 정답 · 콤보 · 연속 숫자만</li>
+  </ul></section>
+  <section><h2>글꼴 2개</h2><ul>
+    <li>제목 · 숫자 · 버튼: 검은고딕(Black Han Sans) 1굵기, SIL OFL 1.1</li>
+    <li>본문: Pretendard 500 · 700 · 800, SIL OFL 1.1</li>
+    <li>글자 단계: 13 · 15 · 18 · 22 · 40 · 64 (배경 숫자 300)</li>
+  </ul></section>
+  <section><h2>모양 · 움직임</h2><ul>
+    <li>둥근 모서리 0. 모든 버튼 · 막대는 −12° 기울임(평행사변형), 글자는 반대로 세움</li>
+    <li>카드 없음. 구역은 가는 선(16% 분필)과 사선 띠로 나눔</li>
+    <li>누르면 2px 밀리고 80ms 흰빛. 정답은 노랑 채움 + "정답" 도장 + 조각 4개</li>
+    <li>들어올 때 140~260ms로 미끄러져 멈춤. 계속 도는 움직임 없음</li>
+  </ul></section>
+  <section><h2>말투</h2><ul>
+    <li>짧은 명사형 · 숫자 먼저: "20개 ▶", "6연속!", "3명 도전 대기"</li>
+    <li>느낌표는 펫 말풍선에만</li>
+  </ul></section>
+</div>
+<p class="note">숫자 · 이름(구미호 루나, 12일, 4승 2패 등)은 예시입니다. 그림은 모두 저장소의 것입니다(public/assets).</p>
+<script>if (location.search.includes('still')) document.body.classList.add('still');</script>
+</body>
+</html>
