@@ -1,6 +1,16 @@
 {
-  // 썸어스 마케팅 운영표 - Cloudflare Workers 정적 사이트 (서버 코드 없음)
+  // 썸어스 마케팅 센터 - Cloudflare Workers 배포 설정
+  // site/ 는 화면 파일, /api 는 worker.js 가 비밀번호를 확인하고 Durable Object(내장 SQLite)에 저장한다.
   "name": "sumus-marketing",
+  "main": "worker.js",
   "compatibility_date": "2026-09-01",
-  "assets": { "directory": "./site" }
+  "assets": { "directory": "./site", "binding": "ASSETS" },
+  "durable_objects": {
+    "bindings": [{ "name": "STORE", "class_name": "MarketingStore" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MarketingStore"] }],
+  "observability": { "enabled": true },
+  // 관리 비밀번호의 SHA-256 해시 (비밀번호 자체는 저장소에 두지 않는다).
+  // 비밀번호를 바꾸려면 이 값을 새 비밀번호의 해시로 바꾸거나, 비밀 값 ADMIN_KEY를 추가한다 (npx wrangler secret put ADMIN_KEY)
+  "vars": { "ADMIN_KEY_HASH": "4c94150c7f3dd1bc3ca0f03954476119da76ae0f18ec723af77ed7618c992165" }
 }
