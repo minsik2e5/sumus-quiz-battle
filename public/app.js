@@ -638,14 +638,19 @@ function maybeMissedYou() {
 async function leaveBattle() { A.screen = null; await petChanged(); window.scrollTo(0, 0); }
 // V13.61: a student on the home screen checks for a friend's challenge every 20 seconds
 // (a small request; the full refresh stays every 2 minutes).
+// V13.244 요청 수 자동 조절: 서버가 내려 주는 배수(poll_scale 1 · 2 · 4)만큼 자동 새로고침을 건너뛴다. 간격을 줄이는 길은 없다(1 미만은 1로 본다).
+const pollTicks = {};
+const pollSlow = key => { const scale = Math.max(1, Math.min(4, Math.floor(Number(A.data?.poll_scale) || 1))); pollTicks[key] = (pollTicks[key] || 0) + 1; return scale > 1 && pollTicks[key] % scale !== 0; };
 let invitePoll;
 function startInvitePolling() {
   clearInterval(invitePoll);
   if (A.data?.profile?.role !== 'student') return;
   invitePoll = setInterval(async () => {
     if (!A.data || A.screen || A.tab !== 'home' || document.visibilityState !== 'visible' || $('#modal-root').children.length) return;
+    if (pollSlow('invite')) return;
     try {
-      const { invite, arena_invite: arena } = await api('/battle/invite');
+      const { invite, arena_invite: arena, poll_scale: scale } = await api('/battle/invite');
+      A.data.poll_scale = scale || 1;
       // V13.230 펫 아레나 친구 대전 초대도 같은 확인에 실려 온다(새 자동 새로고침 없음).
       const arenaBefore = A.data.arena_invite;
       if ((arena?.id || null) !== (arenaBefore?.id || null)) {
@@ -670,7 +675,7 @@ function startTournamentPolling() {
     if (!A.data || A.screen || A.tab !== 'tournaments' || document.visibilityState !== 'visible' || $('#modal-root').children.length) return;
     if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
     const active = (A.data.tournaments || []).filter(t => t.status === 'active');
-    if (!active.length) return;
+    if (!active.length || pollSlow('tournament')) return;
     // V13.71: fetch only the live tournaments and redraw only a bracket that changed (the whole
     // teacher bootstrap and page were reloaded every 8 seconds before).
     try {
@@ -714,7 +719,7 @@ function startPolling() {
     const liveTabs = A.data.profile.role === 'teacher'
       ? ['dashboard', 'exams', 'results', 'tournaments']
       : ['home', 'ranking'];
-    if (!liveTabs.includes(A.tab)) return;
+    if (!liveTabs.includes(A.tab) || pollSlow('refresh')) return;
     try { await refresh(); renderKeepScroll(); }
     catch (err) { if (err.status === 401) { clearInterval(poll); A.data = null; loginView(); } }
   }, interval);

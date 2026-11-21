@@ -275,10 +275,10 @@ export async function runArenaChecks(assert) {
   // 11) V13.228 화면: 끌어서 조준 · 타격감 · 렉 방지 금지 패턴.
   {
     const ui = source('../public/modules/arena.js'), css = source('../public/v13228.css'), build = source('./build-assets.mjs');
-    assert(build.includes('"v13228.css"') && ['function aimShape(', "addEventListener('pointermove'", 'press(d.btn, true, d.on ? d.code : -1)', 'aimCode(dx / g.w, dy / g.h)', 'id="ar-aim"', 'id="ar-aim-spot"', 'data-ar="aim"', 'INPUT.AIM_EASY', 'INPUT.AIM_AUTO'].every(x => ui.includes(x)) && source('../public/modules/arena-stage.js').includes('function drawFace('),
+    assert(build.includes('"v13228.css"') && ['function aimShape(', "addEventListener('pointermove'", 'press(d.btn, true, d.on ? d.code : -1)', 'aimCode(dx / g.w, dy / g.h)', 'function drawAim(', 'R.aimView', 'data-ar="aim"', 'INPUT.AIM_EASY', 'INPUT.AIM_AUTO'].every(x => ui.includes(x)) && source('../public/modules/arena-stage.js').includes('function drawFace('),
       'V13.228 화면: 스킬 · 필살기 버튼을 끌면 화살표 · 부채꼴 · 원으로 조준하고 놓으면 그 방향, 바라보는 쪽 화살표, 대기실에서 조준 방식(직접 · 쉬움 · 자동)');
     const stage = source('../public/modules/arena-stage.js');
-    assert(['function hitStop(', 'stage()?.hitStop(ms)', 'function flash(', 'function dmgNum(', "pop('치명타!'", 'function combo(', 'function finale(', 'function shakeField(', 'function zoomAt(', 'now - (sfxAt.get(key)', "e.who === 'me' && e.hit) buzz"].every(x => ui.includes(x)) && css.includes('.ar-lite .ar-flash{filter:none') && stage.includes('if (!big && lite()) return;') && stage.includes('if (nums.length >= LIST_MAX.nums) nums.shift();'),
+    assert(['function hitStop(', 'stage()?.hitStop(ms)', 'function flash(', 'function dmgNum(', "pop('급소!'", 'function combo(', 'function finale(', 'function shakeField(', 'function zoomAt(', 'now - (sfxAt.get(key)', "e.who === 'me' && e.hit) buzz"].every(x => ui.includes(x)) && css.includes('.ar-lite .ar-flash{filter:none') && stage.includes('if (!big && lite()) return;') && stage.includes('if (nums.length >= LIST_MAX.nums) nums.shift();'),
       'V13.228 타격감: 히트스톱(V13.238부터 연출 시간만) · 피격 섬광 · 큰 숫자(상한) · 치명타 · 콤보 · 마지막 한 방 슬로 · 경기장 흔들림 · 줌 · 소리 겹치기(0.05초) · 진동. 저사양은 조각만 줄이고 느낌은 그대로');
     const drawHud = ui.slice(ui.indexOf('function drawHud()'), ui.indexOf('function drawPad()')), placeFn = ui.slice(ui.indexOf('function place(frac)'), ui.indexOf('function loop(now)'));
     const banned = ["app()?.classList.add('ult')", "classList.add('shake')", 'fxPunch(app()', 'fxSkillCutIn(', 'style.zIndex = String(10 + Math.round(y))', "left: `${x}%`"];
@@ -522,7 +522,7 @@ export async function runArenaChecks(assert) {
     assert(c33.includes('.ar-shot.idle,.ar-warn:not(.on),.ar-mine:not(.on),.ar-zone:not(.on),.ar-line:not(.on),.ar-cone:not(.on),.ar-clone:not(.on),.ar-stream{will-change:auto}') && !/class="ar-(shot|warn|zone|line|stream|cone|clone)/.test(ui) && ui.includes('<canvas class="ar-cv"'),
       'V13.235 쉬는 칸은 레이어로 올리지 않는다 → V13.238부터 칸 자체가 없고 캔버스 한 장(레이어 하나)');
     // 3) 자세 그림: 그림 주소를 바꾸지 않고 미리 겹친 칸을 opacity로(바꿀 때마다 디코드 · 그림자 필터를 다시 그렸다).
-    assert(fn('drawMon').includes("poses: { attack: expressionSrc(f.key, form, 'attack'), hurt: expressionSrc(f.key, form, 'hurt') }") && stage.includes('p.poses[k] = sprites(im, Math.round(p.sz * S)') && !ui.includes('function swapPose('),
+    assert(fn('drawMon').includes("poses: { attack: expressionSrc(f.key, form, 'attack'), hurt: expressionSrc(f.key, form, 'hurt') }") && stage.includes('p.poses[k] = sprites(im, Math.round(p.sz * S * SPR_K)') && !ui.includes('function swapPose('),
       'V13.235 공격 · 맞는 자세: 미리 받아 둔 그림만 켠다(V13.238 무대가 보일 크기로 한 번 줄여 둔 그림, 주소 바꾸기 · 다시 디코드 없음)');
     // 4) 잔상 · 컷인: 판마다 만든 칸을 다시 쓴다(펫 칸 통째 복제 · 첫 필살기 때 새 그림 디코드 금지).
     assert(!fn('afterimage').includes('cloneNode') && stage.includes('if (ghosts.length >= LIST_MAX.ghosts) ghosts.shift();') && !/pet\.innerHTML\s*=/.test(fn('cutin')) && c33.includes('.ar-ghost-slot .ar-body{animation:none;will-change:auto}') && c33.includes('.ar-cut .fx2-cut-pet .avatar-art:not(.on){display:none}'),
