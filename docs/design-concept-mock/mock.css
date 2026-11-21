@@ -54,3 +54,5 @@ body.board.solo { padding: 0; background: #000; }
 .solo > header, .solo .rules, .solo .note, .solo .spec, .solo figcaption, .solo .shot:not(:first-child) { display: none; }
 .solo .phones { display: block; }
 .solo .phone { border-radius: 0; box-shadow: none; }
+.solo.solo2 .shot:first-child { display: none; }
+.solo.solo2 .shot:nth-child(2) { display: block; }

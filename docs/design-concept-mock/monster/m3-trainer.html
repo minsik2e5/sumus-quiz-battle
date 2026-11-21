@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>몬스터 3 · 트레이너 카드</title>
+<link rel="stylesheet" href="../mock.css">
+<link rel="stylesheet" href="base.css">
+<style>
+/* ===== 3 · 트레이너 카드 — 내 카드 · 칭호 배지 · 함께하는 펫 6마리 ===== */
+.M3 { --navy: #23305e; --navy2: #17203f; --gold: #f2c14e; --cream: #fff8e6; --sky: #8fd3ff; --coral: #ff7a59; --sub: #66708d; background: linear-gradient(180deg, #dff3ff 0%, #f6fbff 40%); color: var(--navy); font-family: "Pretendard", sans-serif; }
+.M3 .dh { font-family: "Do Hyeon", sans-serif; font-weight: 400; }
+.M3 .top { position: absolute; left: 16px; right: 16px; top: 16px; display: flex; justify-content: space-between; align-items: center; }
+.M3 .top h1 { font-size: 26px; }
+.M3 .top span { display: flex; align-items: center; gap: 5px; height: 34px; padding: 0 12px 0 8px; border-radius: 99px; background: #fff; font-size: 14px; font-weight: 800; box-shadow: 0 2px 0 rgba(35,48,94,.15); }
+.M3 .top img { width: 20px; height: 20px; }
+.M3 .card { position: absolute; left: 12px; right: 12px; top: 60px; height: 226px; border-radius: 22px; background: var(--cream); box-shadow: 0 5px 0 rgba(35,48,94,.2), inset 0 0 0 3px #fff; overflow: hidden; animation: m3-card 560ms cubic-bezier(.03,.4,.1,1) both; }
+.M3 .card .band { height: 42px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; background: var(--navy); color: #fff; font-size: 17px; }
+.M3 .card .band small { font-family: "Orbit"; font-size: 12px; color: var(--gold); }
+.M3 .card .band::after { content: ""; position: absolute; left: 0; right: 0; top: 42px; height: 4px; background: repeating-linear-gradient(90deg, var(--gold) 0 12px, transparent 12px 18px); }
+.M3 .card .photo { position: absolute; right: 14px; top: 58px; width: 112px; height: 140px; border-radius: 16px; background: radial-gradient(circle at 50% 40%, #fff 0 35%, #cfe9ff 36%); overflow: hidden; box-shadow: inset 0 0 0 2px rgba(35,48,94,.12); }
+.M3 .card .photo img { width: 150px; margin: 4px 0 0 -19px; }
+.M3 .card dl { position: absolute; left: 16px; top: 58px; right: 140px; display: grid; grid-template-columns: 56px 1fr; row-gap: 6px; font-size: 13px; }
+.M3 .card dt { color: var(--sub); font-weight: 700; }
+.M3 .card dd { font-weight: 900; }
+.M3 .card .nm { font-family: "Do Hyeon"; font-size: 22px; font-weight: 400; line-height: 1; }
+.M3 .badges { position: absolute; left: 12px; right: 12px; top: 300px; padding: 12px 14px; border-radius: 20px; background: var(--navy); color: #fff; }
+.M3 .badges .h { display: flex; justify-content: space-between; font-size: 14px; }
+.M3 .badges .h small { font-family: "Pretendard"; font-size: 12px; color: #b9c2e6; font-weight: 700; }
+.M3 .badges .row { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 10px; }
+.M3 .badges i { aspect-ratio: 1; border-radius: 50%; background: var(--navy2); box-shadow: inset 0 0 0 2px rgba(255,255,255,.1); display: grid; place-items: center; animation: m3-pop 300ms cubic-bezier(.3,1.6,.5,1) both; }
+.M3 .badges i img { width: 82%; }
+.M3 .party { position: absolute; left: 12px; right: 12px; top: 404px; }
+.M3 .party .h { display: flex; justify-content: space-between; align-items: center; font-size: 17px; }
+.M3 .party .h a { font-family: "Pretendard"; font-size: 12px; font-weight: 800; color: var(--sub); }
+.M3 .slots { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 8px; }
+.M3 .slots i { position: relative; aspect-ratio: 1; border-radius: 16px; background: #fff; box-shadow: 0 3px 0 rgba(35,48,94,.14), inset 0 0 0 2px #e8eef8; overflow: hidden; }
+.M3 .slots i img { position: absolute; left: -4px; top: 0; width: 120%; }
+.M3 .slots i.lead { box-shadow: 0 3px 0 #c99520, inset 0 0 0 3px var(--gold); }
+.M3 .slots i.lead::after { content: "★"; position: absolute; left: 4px; top: 1px; font-size: 12px; color: #c99520; }
+.M3 .lead-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 10px; border-radius: 16px; background: #fff; box-shadow: inset 0 0 0 2px #e8eef8; font-size: 13px; font-weight: 800; }
+.M3 .lead-row b { font-family: "Do Hyeon"; font-weight: 400; font-size: 18px; }
+.M3 .lead-row .sp { flex: 1; }
+.M3 .lead-row a { display: flex; align-items: center; gap: 3px; height: 32px; padding: 0 8px; border-radius: 10px; background: #eef5ff; font-size: 12px; }
+.M3 .lead-row a img { width: 22px; height: 22px; }
+.m3-go { display: flex; align-items: center; justify-content: center; gap: 10px; height: 60px; border-radius: 18px; background: #23305e; color: #fff; font-family: "Do Hyeon", sans-serif; font-size: 23px; text-decoration: none; box-shadow: 0 5px 0 #17203f, inset 0 -3px 0 rgba(0,0,0,.15); transition: transform 90ms, box-shadow 90ms; }
+.m3-go small { font-family: "Pretendard"; font-size: 13px; font-weight: 800; color: #23305e; background: #f2c14e; padding: 3px 9px; border-radius: 99px; }
+.m3-go:active, .m3-go.press { transform: translateY(4px); box-shadow: 0 1px 0 #17203f; }
+.M3 .cta { position: absolute; left: 12px; right: 12px; bottom: 96px; display: grid; grid-template-columns: 1fr 96px; gap: 8px; }
+.M3 .cta .egg { display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 18px; background: #fff; box-shadow: 0 5px 0 rgba(35,48,94,.18); font-size: 12px; font-weight: 800; }
+.M3 .cta .egg img { width: 34px; height: 34px; }
+.M3 .today { position: absolute; left: 12px; right: 12px; top: 590px; display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-radius: 16px; background: #eef5ff; font-size: 13px; font-weight: 700; color: var(--sub); }
+.M3 .today .dh { font-size: 17px; color: var(--navy); }
+.M3 .today b { color: var(--navy); font-weight: 900; }
+.M3 .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 80px; padding: 0 12px 20px; display: flex; justify-content: space-around; align-items: center; background: #fff; box-shadow: 0 -1px 0 #e3e9f5; }
+.M3 .tabs a { font-family: "Do Hyeon"; font-size: 17px; color: #a3abc6; }
+.M3 .tabs a.on { color: var(--navy); box-shadow: inset 0 -4px 0 var(--gold); padding-bottom: 2px; }
+
+/* 야차전: 트레이너 대결 신청 */
+.M3 .vsbg { position: absolute; left: 0; right: 0; top: 0; height: 430px; background: linear-gradient(160deg, var(--navy) 0 50%, #3a2f6e 50% 100%); }
+.M3 .vsbg::after { content: ""; position: absolute; left: 50%; top: -20px; bottom: -20px; width: 8px; background: var(--gold); transform: rotate(28deg); }
+.M3 .tc { position: absolute; width: 196px; padding: 10px; border-radius: 18px; background: var(--cream); box-shadow: 0 5px 0 rgba(0,0,0,.25); }
+.M3 .tc .band { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-radius: 10px; background: var(--navy); color: #fff; font-size: 15px; }
+.M3 .tc .band small { font-family: "Pretendard"; font-size: 11px; color: var(--gold); font-weight: 800; }
+.M3 .tc img { display: block; width: 150px; margin: 2px auto 0; }
+.M3 .tc .meta { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 800; color: var(--sub); }
+.M3 .tc .meta b { color: var(--navy); }
+.M3 .tc.me { left: 12px; top: 56px; animation: m3-l 500ms cubic-bezier(.03,.4,.1,1) both; }
+.M3 .tc.op { right: 12px; top: 200px; animation: m3-r 500ms 80ms cubic-bezier(.03,.4,.1,1) both; }
+.M3 .tc.op .band { background: #4b3a8f; }
+.M3 .vsw { position: absolute; right: 28px; top: 112px; transform: rotate(-8deg); font-family: "Do Hyeon"; font-size: 58px; color: var(--gold); -webkit-text-stroke: 6px var(--navy2); paint-order: stroke fill; animation: m3-pop 320ms 380ms cubic-bezier(.3,1.6,.5,1) both; }
+.M3 .ytabs { position: absolute; left: 12px; right: 12px; top: 14px; display: flex; gap: 6px; }
+.M3 .ytabs a { padding: 6px 12px; border-radius: 99px; font-size: 13px; font-weight: 800; color: #c8d0ee; background: rgba(255,255,255,.08); }
+.M3 .ytabs a.on { background: var(--gold); color: var(--navy); }
+.M3 .rules { position: absolute; left: 12px; right: 12px; top: 446px; display: grid; gap: 8px; }
+.M3 .rl { display: flex; justify-content: space-between; align-items: center; padding: 8px 8px 8px 14px; border-radius: 16px; background: #fff; box-shadow: 0 3px 0 rgba(35,48,94,.12); font-size: 14px; font-weight: 800; }
+.M3 .rl > span { color: var(--sub); }
+.M3 .rl .ch { display: flex; gap: 4px; }
+.M3 .rl .ch a { padding: 7px 12px; border-radius: 12px; font-size: 14px; color: var(--sub); background: #f1f5fb; }
+.M3 .rl .ch a.on { background: var(--navy); color: #fff; }
+.M3 .cta2 { position: absolute; left: 12px; right: 12px; bottom: 96px; }
+@keyframes m3-card { from { transform: rotateX(70deg) translateY(-30px); opacity: 0; } }
+@keyframes m3-pop { from { transform: scale(.3); opacity: 0; } }
+@keyframes m3-l { from { transform: translateX(-80px) rotate(-6deg); opacity: 0; } }
+@keyframes m3-r { from { transform: translateX(80px) rotate(6deg); opacity: 0; } }
+</style>
+</head>
+<body class="board">
+<header><h1>몬스터 3 · 트레이너 카드</h1><p>홈이 "내 트레이너 카드". 학교 · 반, 연속 일수, 도감, 대결 기록이 카드에 적히고, 칭호는 배지 상자, 펫 6마리가 함께 다님. 야차전은 트레이너 카드끼리 맞붙는 대결 신청. <a href="index.html">← 몬스터 갈래 목록</a></p></header>
+<div class="phones">
+  <figure class="shot"><figcaption>홈</figcaption>
+  <div class="phone M3" data-screen="home">
+    <div class="top"><h1 class="dh">내 트레이너 카드</h1><span><img src="../../../public/assets/ui/coin.webp" alt="">890</span></div>
+    <div class="card">
+      <div class="band dh">수무스 트레이너 <small>#10417</small></div>
+      <dl><dt>이름</dt><dd class="nm">김민지</dd><dt>학교</dt><dd>단원고 1학년 A반</dd><dt>연속</dt><dd>12일째</dd><dt>도감</dt><dd>22 / 94</dd><dt>야차전</dt><dd>4승 2패 · 브론즈</dd><dt>이번 주</dt><dd>90단어 · 고1 3위</dd></dl>
+      <div class="photo"><img src="../../../public/assets/pets/baekho-3.webp" alt=""></div>
+    </div>
+    <div class="badges"><div class="h dh">칭호 배지 <small>11 / 172 · 모두 보기</small></div>
+      <div class="row"><i style="animation-delay:300ms"><img src="../../../public/assets/ui/badge-first100.webp" alt=""></i><i style="animation-delay:350ms"><img src="../../../public/assets/ui/badge-english100.webp" alt=""></i><i style="animation-delay:400ms"><img src="../../../public/assets/ui/badge-streak90.webp" alt=""></i><i style="animation-delay:450ms"><img src="../../../public/assets/ui/epic-badge.webp" alt=""></i><i style="animation-delay:500ms"><img src="../../../public/assets/ui/mythic-badge.webp" alt=""></i><i></i><i></i><i></i></div></div>
+    <div class="party"><div class="h dh">함께하는 펫 <a>22마리 중 6</a></div>
+      <div class="slots"><i class="lead"><img src="../../../public/assets/pets/baekho-3-s.webp" alt=""></i><i><img src="../../../public/assets/pets/haechi-3-s.webp" alt=""></i><i><img src="../../../public/assets/pets/fox-3-s.webp" alt=""></i><i><img src="../../../public/assets/pets/penguin-3-s.webp" alt=""></i><i><img src="../../../public/assets/pets/tiger-3-s.webp" alt=""></i><i><img src="../../../public/assets/pets/cat-3-s.webp" alt=""></i></div>
+      <div class="lead-row"><b>백호</b><span class="gb myth">신화</span><span class="tb buff">강화</span><span class="sp"></span><a><img src="../../../public/assets/ui/care-pet.webp" alt="">쓰다듬기</a><a><img src="../../../public/assets/ui/care-feed.webp" alt="">밥</a></div>
+    </div>
+    <div class="today"><span class="dh">오늘의 모험</span><span>단어 <b>7/20</b></span><span>야차전 <b>0/1</b></span><span>놀이터 <b>33판</b></span></div>
+    <div class="cta"><a class="m3-go" href="#">오늘 단어 20 <small>+200 경험치</small></a><a class="egg"><img src="../../../public/assets/ui/egg-shop.webp" alt="">알 상점</a></div>
+    <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+
+  <figure class="shot"><figcaption>야차전 (트레이너 대결 신청)</figcaption>
+  <div class="phone M3" data-screen="second">
+    <div class="vsbg"></div>
+    <nav class="ytabs"><a class="on">대결</a><a>몬스터</a><a>던전</a><a>기록</a></nav>
+    <div class="tc me"><div class="band dh">김민지 <small>고1-A</small></div><img src="../../../public/assets/pets/baekho-3.webp" alt=""><div class="meta"><span>백호 <b>Lv.3</b></span><span class="tb buff">강화</span></div></div>
+    <div class="tc op"><div class="band dh">이도윤 <small>고1-A</small></div><img src="../../../public/assets/pets/jujak-3.webp" alt=""><div class="meta"><span>주작 <b>Lv.3</b></span><span class="tb dot">지속</span></div></div>
+    <div class="vsw">대결!</div>
+    <div class="rules">
+      <div class="rl"><span>방식</span><div class="ch"><a class="on">스피드</a><a>실력</a></div></div>
+      <div class="rl"><span>단어</span><div class="ch"><a class="on">각자 내 범위</a><a>같은 범위</a></div></div>
+      <div class="rl"><span>판돈</span><div class="ch"><a>10</a><a class="on">30</a><a>50</a></div></div>
+    </div>
+    <div class="cta2"><a class="m3-go" href="#">대결 신청 보내기 <small>이기면 +30</small></a></div>
+    <nav class="tabs"><a>홈</a><a>학습</a><a class="on">야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+
+  <aside class="spec"><div class="no">3</div><h2>트레이너 카드</h2><p class="one">홈 = 내 트레이너 카드 + 칭호 배지 상자 + 함께하는 펫 6마리. 야차전은 카드끼리 맞대결.</p>
+    <h3>색</h3><div class="sws"><i style="background:#23305e" data-c="#23305e"></i><i style="background:#f2c14e" data-c="#f2c14e"></i><i style="background:#fff8e6" data-c="#fff8e6"></i><i style="background:#8fd3ff" data-c="#8fd3ff"></i><i style="background:#4b3a8f" data-c="#4b3a8f"></i></div>
+    <h3 style="margin-top:24px">제목 글꼴 · 도현(Do Hyeon) OFL</h3><div class="fs" style="font-family:'Do Hyeon'">내 트레이너 카드</div><div class="fn">본문 Pretendard 800 · 900 · 카드 번호 Orbit</div>
+    <h3>버튼</h3><div class="bt"><a class="m3-go" href="#">오늘 단어 20 <small>+200 경험치</small></a></div>
+    <h3>특기 · 등급 배지</h3><div class="tbs"><span class="tb atk">공격</span><span class="tb def">방어</span><span class="tb heal">회복</span><span class="tb buff">강화</span><span class="tb dot">지속</span><span class="gb myth">신화</span><span class="gb limited">한정</span></div>
+  </aside>
+</div>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo'); if (location.search.includes('solo2')) document.body.classList.add('solo2');</script>
+</body>
+</html>

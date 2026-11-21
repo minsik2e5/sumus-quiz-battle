@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>몬스터 4 · 대결 명령</title>
+<link rel="stylesheet" href="../mock.css">
+<link rel="stylesheet" href="base.css">
+<style>
+/* ===== 4 · 대결 명령 — 상태 창 · 대사 창 · 명령 칸이 홈부터 공부 · 대결까지 이어짐 ===== */
+.M4 { --dusk1: #2a5ca8; --dusk2: #7fc8e8; --field: #8fd18a; --field2: #5fae63; --ink: #1b1f2e; --white: #ffffff; --hp: #2fd06b; --hpw: #ffc331; --hpd: #ff5a4a; --sub: #5f6677;
+  background: linear-gradient(180deg, var(--dusk1) 0%, var(--dusk2) 46%, var(--field) 46%, var(--field2) 100%); color: var(--ink); font-family: "Pretendard", sans-serif; }
+.M4 .bh { font-family: "Black Han Sans", sans-serif; font-weight: 400; }
+.M4 .box { position: absolute; z-index: 3; background: var(--white); border-radius: 14px; box-shadow: 0 0 0 3px var(--ink), 0 6px 0 3px rgba(27,31,46,.35); }
+.M4 .stat { padding: 10px 12px; width: 220px; }
+.M4 .stat .r1 { display: flex; align-items: center; gap: 6px; }
+.M4 .stat .r1 b { font-family: "Black Han Sans"; font-weight: 400; font-size: 20px; }
+.M4 .stat .r1 .lv { margin-left: auto; font-family: "Black Han Sans"; font-size: 15px; }
+.M4 .stat .r2 { margin-top: 5px; display: flex; gap: 4px; }
+.M4 .hp { margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 900; }
+.M4 .hp .lab { padding: 1px 5px; border-radius: 4px; background: var(--ink); color: var(--hpw); }
+.M4 .hp .bar { flex: 1; height: 10px; border-radius: 99px; background: #d9dde6; box-shadow: inset 0 0 0 2px var(--ink); overflow: hidden; }
+.M4 .hp .bar i { display: block; height: 100%; background: var(--hp); transform-origin: left; }
+.M4 .hp .n { font-family: "Black Han Sans"; font-size: 13px; min-width: 50px; text-align: right; }
+.M4 .ring { position: absolute; border-radius: 50%; background: radial-gradient(ellipse, rgba(255,255,255,.55) 0 40%, rgba(255,255,255,0) 41%), radial-gradient(ellipse, var(--field2) 0 62%, transparent 63%); }
+.M4 .dlg { left: 10px; right: 10px; padding: 14px 16px; font-size: 16px; font-weight: 700; line-height: 1.45; }
+.M4 .dlg b { font-family: "Black Han Sans"; font-weight: 400; color: #2a5ca8; }
+.M4 .dlg::after { content: "▼"; position: absolute; right: 14px; bottom: 8px; font-size: 11px; color: var(--ink); animation: m4-blink 900ms steps(2) 3; }
+.M4 .cmd { position: absolute; left: 10px; right: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.M4 .cmd a { position: relative; height: 54px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; background: var(--white); box-shadow: 0 0 0 3px var(--ink), 0 4px 0 3px var(--ink); font-size: 16px; font-weight: 900; transition: transform 80ms; }
+.M4 .cmd a small { font-size: 12px; font-weight: 800; color: var(--sub); }
+.M4 .cmd a.c-atk { background: #ffe2dc; } .M4 .cmd a.c-def { background: #dfe9ff; } .M4 .cmd a.c-heal { background: #d9f5e5; } .M4 .cmd a.c-buff { background: #ffefcc; } .M4 .cmd a.c-dot { background: #ece3ff; }
+.M4 .cmd a.dim { opacity: .45; }
+.M4 .cmd a.ok { background: var(--hp); color: var(--white); }
+.M4 .cmd a.ok small { color: #e6ffef; }
+.m4-go { grid-column: 1 / -1; color: #1b1f2e !important; text-decoration: none; height: 62px !important; background: #ffc331 !important; font-family: "Black Han Sans", sans-serif; font-weight: 400 !important; font-size: 22px !important; }
+.m4-go::before { content: "▶"; margin-right: 8px; font-size: 16px; animation: m4-nudge 700ms ease-in-out 3; }
+.m4-go:active, .m4-go.press { transform: translateY(4px); box-shadow: 0 0 0 3px #1b1f2e, 0 0 0 3px #1b1f2e !important; }
+.spec .m4-go { display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-radius: 12px; box-shadow: 0 0 0 3px #1b1f2e, 0 4px 0 3px #1b1f2e; color: #1b1f2e; text-decoration: none; transition: transform 80ms; }
+.M4 .top { position: absolute; left: 12px; right: 12px; top: 14px; display: flex; justify-content: space-between; color: #fff; font-size: 13px; font-weight: 800; }
+.M4 .top span { padding: 5px 10px; border-radius: 99px; background: rgba(27,31,46,.45); }
+.M4 .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 78px; padding: 0 12px 18px; display: flex; justify-content: space-around; align-items: center; background: var(--ink); }
+.M4 .tabs a { font-family: "Black Han Sans"; font-size: 16px; color: #8a91a8; }
+.M4 .tabs a.on { color: var(--hpw); }
+.M4 .tabs a.on::before { content: "▶ "; font-size: 11px; }
+
+/* 홈 */
+.M4 .h-stat { left: 12px; top: 52px; animation: m4-in-l 420ms cubic-bezier(.03,.4,.1,1) both; }
+.M4 .h-ring { left: 50%; top: 360px; width: 290px; height: 70px; margin-left: -145px; }
+.M4 .h-pet { position: absolute; left: 50%; top: 150px; width: 270px; margin-left: -135px; animation: m4-appear 700ms 150ms both; }
+.M4 .h-dlg { top: 436px; }
+.M4 .h-cmd { top: 540px; }
+/* 대결 */
+.M4 .op-stat { left: 12px; top: 50px; } .M4 .op-stat .hp .bar i { background: var(--hpw); transform: scaleX(.38); animation: m4-drain 700ms 520ms cubic-bezier(.03,.4,.1,1) both; }
+.M4 .me-stat { right: 12px; top: 304px; animation: m4-in-r 420ms cubic-bezier(.03,.4,.1,1) both; } .M4 .me-stat .hp .bar i { transform: scaleX(.87); }
+.M4 .sp { margin-top: 6px; display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 900; }
+.M4 .sp i { width: 14px; height: 8px; border-radius: 2px; background: #d9dde6; box-shadow: inset 0 0 0 1.5px var(--ink); }
+.M4 .sp i.f { background: #3b7cf0; }
+.M4 .op-ring { right: 6px; top: 220px; width: 200px; height: 52px; }
+.M4 .op { position: absolute; right: 22px; top: 70px; width: 170px; transform: scaleX(-1); animation: m4-hit 520ms 480ms both; }
+.M4 .me-ring { left: -10px; top: 390px; width: 230px; height: 58px; }
+.M4 .me { position: absolute; left: 4px; top: 214px; width: 210px; transform: scaleX(-1); animation: m4-lunge 420ms 260ms both; }
+.M4 .dmg { position: absolute; right: 80px; top: 92px; font-family: "Black Han Sans"; font-size: 40px; color: var(--hpd); -webkit-text-stroke: 6px #fff; paint-order: stroke fill; animation: m4-dmg 800ms 500ms both; }
+.M4 .b-dlg { top: 444px; }
+.M4 .b-cmd { top: 552px; }
+@keyframes m4-blink { 50% { opacity: 0; } }
+@keyframes m4-nudge { 50% { transform: translateX(4px); } }
+@keyframes m4-in-l { from { transform: translateX(-60px); opacity: 0; } }
+@keyframes m4-in-r { from { transform: translateX(60px); opacity: 0; } }
+@keyframes m4-appear { 0% { transform: scale(.2); opacity: 0; } 60% { transform: scale(1.06); opacity: 1; } 100% { transform: none; } }
+@keyframes m4-drain { from { transform: scaleX(.6); } }
+@keyframes m4-hit { 0%, 100% { transform: scaleX(-1); opacity: 1; } 25% { transform: scaleX(-1) translateX(-10px); opacity: .3; } 50% { transform: scaleX(-1) translateX(8px); opacity: 1; } 75% { opacity: .4; } }
+@keyframes m4-lunge { 0%, 100% { transform: scaleX(-1); } 40% { transform: scaleX(-1) translate(-40px, -20px); } }
+@keyframes m4-dmg { 0% { transform: scale(.4); opacity: 0; } 30% { transform: scale(1.2); opacity: 1; } 100% { transform: translateY(-16px); opacity: 1; } }
+</style>
+</head>
+<body class="board">
+<header><h1>몬스터 4 · 대결 명령</h1><p>상태 창(이름 · 배지 · 막대) + 대사 창 + 명령 칸. 홈도 "무엇을 할까?"라고 묻고, 공부 · 쓰다듬기 · 밥 주기가 명령입니다. 야차전은 단어 문제의 답이 곧 공격 명령. <a href="index.html">← 몬스터 갈래 목록</a></p></header>
+<div class="phones">
+  <figure class="shot"><figcaption>홈</figcaption>
+  <div class="phone M4" data-screen="home">
+    <div class="top"><span>단원고 1-A · 연속 12일</span><span>코인 890</span></div>
+    <div class="box stat h-stat"><div class="r1"><b>청룡</b><span class="lv">Lv.3</span></div><div class="r2"><span class="gb myth">신화</span><span class="tb atk">공격</span></div><div class="hp"><span class="lab">경험치</span><span class="bar"><i style="transform:scaleX(.6)"></i></span><span class="n">350/500</span></div></div>
+    <div class="ring h-ring"></div>
+    <img class="h-pet" src="../../../public/assets/pets/cheongryong-3.webp" alt="">
+    <div class="box dlg h-dlg">청룡은 오늘 단어 <b>20개</b>를 기다리고 있다.<br>무엇을 할까?</div>
+    <div class="cmd h-cmd">
+      <a class="m4-go" href="#">공부한다 · 단어 20<small>+200</small></a>
+      <a class="c-atk">겨룬다<small>야차전 3명</small></a>
+      <a class="c-buff">논다<small>놀이터 33판</small></a>
+      <a class="c-heal">쓰다듬는다<small>+10</small></a>
+      <a class="c-def">밥을 준다<small>+10</small></a>
+    </div>
+    <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>가방</a></nav>
+  </div></figure>
+
+  <figure class="shot"><figcaption>야차전 대결 (답이 곧 공격 명령)</figcaption>
+  <div class="phone M4" data-screen="second">
+    <div class="box stat op-stat"><div class="r1"><b>주작</b><span class="lv">Lv.3</span></div><div class="r2"><span class="gb myth">신화</span><span class="tb atk">공격</span><span class="tb dot">지속</span></div><div class="hp"><span class="lab">체력</span><span class="bar"><i></i></span><span class="n">23/60</span></div></div>
+    <div class="ring op-ring"></div>
+    <img class="op" src="../../../public/assets/pets/jujak-3.webp" alt="">
+    <div class="dmg">−12</div>
+    <div class="ring me-ring"></div>
+    <img class="me" src="../../../public/assets/pets/cheongryong-3.webp" alt="">
+    <div class="box stat me-stat"><div class="r1"><b>청룡</b><span class="lv">Lv.3</span></div><div class="hp"><span class="lab">체력</span><span class="bar"><i></i></span><span class="n">52/60</span></div><div class="sp">푸른 용오름 <i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i></div></div>
+    <div class="box dlg b-dlg">청룡의 공격! 주작에게 <b>12</b> 피해.<br>다음 단어 <b>cultivate</b> 의 뜻은?</div>
+    <div class="cmd b-cmd">
+      <a class="dim">수확하다</a><a class="ok">재배하다, 기르다<small>정답</small></a>
+      <a class="dim">보존하다</a><a class="dim">개척하다</a>
+      <a class="c-def" style="grid-column:1/-1">특기 · 푸른 용오름 <small>1문제 더 맞히면 사용</small></a>
+    </div>
+    <nav class="tabs"><a>홈</a><a>학습</a><a class="on">야차전</a><a>놀이터</a><a>가방</a></nav>
+  </div></figure>
+
+  <aside class="spec"><div class="no">4</div><h2>대결 명령</h2><p class="one">상태 창 · 대사 창 · 명령 칸. 홈도 "무엇을 할까?", 야차전은 답이 곧 공격 명령.</p>
+    <h3>색</h3><div class="sws"><i style="background:#2a5ca8" data-c="#2a5ca8"></i><i style="background:#8fd18a" data-c="#8fd18a"></i><i style="background:#1b1f2e" data-c="#1b1f2e"></i><i style="background:#2fd06b" data-c="#2fd06b"></i><i style="background:#ffc331" data-c="#ffc331"></i></div>
+    <h3 style="margin-top:24px">제목 · 숫자 글꼴 · 검은고딕 OFL</h3><div class="fs" style="font-family:'Black Han Sans'">공부한다 · 52/60</div><div class="fn">대사 · 본문 Pretendard 700 · 900</div>
+    <h3>버튼</h3><div class="bt"><a class="m4-go" href="#">공부한다 · 단어 20<small>+200</small></a></div>
+    <h3>특기 · 등급 배지</h3><div class="tbs"><span class="tb atk">공격</span><span class="tb def">방어</span><span class="tb heal">회복</span><span class="tb buff">강화</span><span class="tb dot">지속</span><span class="gb myth">신화</span><span class="gb legend">전설</span></div>
+  </aside>
+</div>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo'); if (location.search.includes('solo2')) document.body.classList.add('solo2');</script>
+</body>
+</html>
