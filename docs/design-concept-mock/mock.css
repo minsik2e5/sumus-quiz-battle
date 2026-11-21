@@ -1,0 +1,58 @@
+/* 시안 공통: 바깥 판과 폰 틀만. 각 방향의 모양은 각 HTML <style>에 있다. */
+@font-face { font-family: "Pretendard"; src: url("fonts/pretendard-mock.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Black Han Sans"; src: url("fonts/blackhansans-mock.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Hahmlet"; src: url("fonts/hahmlet-mock.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Gasoek One"; src: url("fonts/gasoekone-mock.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Song Myung"; src: url("fonts/songmyung-mock.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Orbit"; src: url("fonts/orbit-mock.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Do Hyeon"; src: url("fonts/dohyeon-mock.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Gaegu"; src: url("fonts/gaegu-bold-mock.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Oswald"; src: url("fonts/oswald-mock.woff2") format("woff2"); font-weight: 200 700; font-display: swap; }
+@font-face { font-family: "Galmuri11"; src: url("fonts/galmuri11-mock.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Galmuri11"; src: url("fonts/galmuri11-bold-mock.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body.board { background: #d9d9de; font-family: "Pretendard", system-ui, sans-serif; color: #18181b; padding: 28px 20px 60px; }
+.board > header { max-width: 1260px; margin: 0 auto 22px; }
+.board > header h1 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.board > header p { margin-top: 6px; font-size: 15px; color: #45454d; line-height: 1.55; max-width: 760px; }
+.board > header a { color: inherit; }
+.phones { display: flex; gap: 28px; flex-wrap: wrap; justify-content: center; }
+.shot { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.shot > figcaption { font-size: 14px; font-weight: 700; color: #45454d; }
+.phone { position: relative; width: 390px; height: 844px; overflow: hidden; border-radius: 34px; box-shadow: 0 0 0 10px #111, 0 18px 40px rgba(0,0,0,.25); isolation: isolate; }
+.rules { max-width: 1260px; margin: 40px auto 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.rules section { background: #fff; border-radius: 14px; padding: 18px 20px; }
+.rules h2 { font-size: 16px; font-weight: 800; margin-bottom: 10px; }
+.rules li { font-size: 14px; line-height: 1.6; margin-left: 18px; color: #33333a; }
+.sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.note { max-width: 1260px; margin: 18px auto 0; font-size: 13px; color: #55555d; }
+
+/* ?still: 들어오는 움직임 없이 끝난 화면 (스크린샷용) */
+.still *, .still *::before, .still *::after { animation-delay: -10s !important; animation-duration: .001s !important; animation-iteration-count: 1 !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; transition: none !important; }
+}
+
+/* 견본 카드 (방향마다 홈 옆) */
+.spec { width: 300px; align-self: flex-start; margin-top: 30px; background: #fff; border-radius: 16px; padding: 20px; color: #18181b; font-family: "Pretendard", sans-serif; }
+.spec .no { font-size: 64px; font-weight: 900; line-height: .9; letter-spacing: -.04em; }
+.spec h2 { margin-top: 8px; font-size: 22px; font-weight: 900; letter-spacing: -.02em; }
+.spec .one { margin-top: 6px; font-size: 14px; line-height: 1.5; color: #45454d; }
+.spec h3 { margin-top: 16px; font-size: 12px; font-weight: 800; color: #6b6b73; }
+.spec .sws { margin-top: 6px; display: flex; gap: 6px; }
+.spec .sws i { flex: 1; height: 44px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); position: relative; }
+.spec .sws i::after { content: attr(data-c); position: absolute; left: 0; right: 0; bottom: -16px; font-size: 9.5px; font-style: normal; text-align: center; color: #55555d; }
+.spec .fs { margin-top: 6px; font-size: 30px; line-height: 1.15; }
+.spec .fn { margin-top: 4px; font-size: 12px; color: #55555d; }
+.spec .bt { margin-top: 8px; }
+.spec .ref { margin-top: 14px; font-size: 12px; color: #55555d; line-height: 1.5; }
+
+/* ?solo: 홈 화면 하나만 화면 가득 (영상 녹화용) */
+body.board.solo { padding: 0; background: #000; }
+.solo > header, .solo .rules, .solo .note, .solo .spec, .solo figcaption, .solo .shot:not(:first-child) { display: none; }
+.solo .phones { display: block; }
+.solo .phone { border-radius: 0; box-shadow: none; }
+.solo.solo2 .shot:first-child { display: none; }
+.solo.solo2 .shot:nth-child(2) { display: block; }

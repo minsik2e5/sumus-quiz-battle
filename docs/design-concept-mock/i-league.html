@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 I · 학교 리그 중계</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+/* ===== I · 학교 리그 중계 — 스포츠 중계 화면 + 순위표 ===== */
+.I { --white: #ffffff; --ink: #0f1115; --green: #00b86b; --volt: #e9ff00; --gray: #eef0f2; background: var(--white); color: var(--ink); font-family: "Pretendard", sans-serif; }
+.I .os { font-family: "Oswald", sans-serif; }
+.I .hero { position: absolute; left: 0; right: 0; top: 0; height: 330px; background: var(--green); overflow: hidden; }
+.I .hero::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(-60deg, rgba(255,255,255,.08) 0 18px, transparent 18px 36px); }
+.I .live { position: absolute; left: 18px; top: 20px; display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 800; color: var(--white); }
+.I .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--volt); }
+.I .coin { position: absolute; right: 18px; top: 18px; font-size: 15px; font-weight: 800; color: var(--white); }
+.I .num { position: absolute; left: 14px; top: 44px; font-family: "Oswald"; font-weight: 700; font-size: 190px; line-height: 1; color: rgba(255,255,255,.18); letter-spacing: -.04em; }
+.I .pet { position: absolute; right: -40px; top: 40px; width: 320px; animation: i-in 480ms cubic-bezier(.03,.4,.1,1) both; }
+.I .player { position: absolute; left: 18px; top: 200px; color: var(--white); }
+.I .player small { font-size: 13px; font-weight: 700; opacity: .85; }
+.I .player h1 { font-size: 40px; font-weight: 900; letter-spacing: -.05em; line-height: 1; margin-top: 2px; }
+.I .board2 { position: absolute; left: 0; right: 0; top: 276px; height: 54px; display: grid; grid-template-columns: repeat(3, 1fr); background: var(--ink); color: var(--white); }
+.I .board2 div { display: flex; align-items: baseline; justify-content: center; gap: 6px; font-size: 12px; color: #a7adb8; border-left: 1px solid #2a2e36; padding-top: 10px; }
+.I .board2 div:first-child { border: 0; }
+.I .board2 b { font-family: "Oswald"; font-size: 26px; font-weight: 600; color: var(--white); }
+.I .board2 b.v { color: var(--volt); }
+.I .rank { position: absolute; left: 18px; right: 18px; top: 350px; }
+.I .rank h2 { display: flex; justify-content: space-between; font-size: 15px; font-weight: 900; }
+.I .rank h2 span { font-size: 12px; color: #5b616d; font-weight: 700; }
+.I .row { display: grid; grid-template-columns: 34px 1fr 70px; align-items: center; height: 44px; border-bottom: 1px solid var(--gray); font-size: 15px; font-weight: 700; animation: i-row 360ms cubic-bezier(.03,.4,.1,1) both; }
+.I .row .p { font-family: "Oswald"; font-size: 20px; font-weight: 600; }
+.I .row .s { font-family: "Oswald"; text-align: right; font-size: 17px; }
+.I .row.me { background: var(--volt); margin: 0 -10px; padding: 0 10px; border: 0; }
+.I .row .up { color: var(--green); font-size: 12px; margin-left: 6px; }
+.I .next { position: absolute; left: 18px; right: 18px; top: 552px; font-size: 13px; color: #5b616d; font-weight: 600; }
+.I .next b { color: var(--ink); }
+.i-go { position: absolute; left: 18px; right: 18px; bottom: 98px; height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; background: #0f1115; color: #fff; font-size: 18px; font-weight: 900; text-decoration: none; transform: skewX(-8deg); transition: transform 120ms; }
+.i-go > * { transform: skewX(8deg); }
+.i-go span { font-family: "Oswald"; color: #e9ff00; font-size: 22px; }
+.i-go:active, .i-go.press { transform: skewX(-8deg) scale(.97); }
+.spec .i-go { position: static; }
+.I .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 80px; padding: 0 16px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--gray); }
+.I .tabs a { font-size: 14px; font-weight: 800; color: #9aa0aa; }
+.I .tabs a.on { color: var(--ink); box-shadow: inset 0 -3px 0 var(--green); padding-bottom: 4px; }
+@keyframes i-in { from { transform: translateX(60px); opacity: 0; } }
+@keyframes i-row { from { transform: translateX(-16px); opacity: 0; } }
+</style>
+</head>
+<body class="board">
+<header><h1>시안 I · 학교 리그 중계</h1><p>스포츠 중계처럼: 위는 선수 소개(펫 + 큰 등번호), 가운데 전광판 숫자, 아래 우리 반 순위표. 흰 바탕 + 경기장 초록 + 형광 노랑. 경쟁이 동기인 학생에게. <a href="index.html">← 시안 목록</a></p></header>
+<div class="phones">
+  <figure class="shot"><figcaption>홈</figcaption>
+  <div class="phone I" data-screen="home">
+    <div class="hero">
+      <div class="live"><i></i>이번 주 고1 리그 진행 중</div><div class="coin">890 코인</div>
+      <div class="num">03</div>
+      <img class="pet" src="../../public/assets/pets/shark-3.webp" alt="">
+      <div class="player"><small>단원고 1-A · 레벨 3</small><h1>상어 파도</h1></div>
+    </div>
+    <div class="board2"><div>이번 주<b>90</b></div><div>연속<b>12</b></div><div>순위<b class="v">3위</b></div></div>
+    <div class="rank"><h2>고1 경험치 순위<span>2시간 전</span></h2>
+      <div class="row" style="animation-delay:60ms"><span class="p">1</span><span>김하늘</span><span class="s">1,240</span></div>
+      <div class="row" style="animation-delay:120ms"><span class="p">2</span><span>이도윤</span><span class="s">1,180</span></div>
+      <div class="row me" style="animation-delay:180ms"><span class="p">3</span><span>나<span class="up">▲2</span></span><span class="s">1,150</span></div>
+      <div class="row" style="animation-delay:240ms"><span class="p">4</span><span>박서준</span><span class="s">1,090</span></div>
+    </div>
+    <div class="next">2위까지 <b>30</b> · 오늘 20단어면 넘어요</div>
+    <a class="i-go" href="#"><b>경기 시작 · 20단어</b><span>+200</span></a>
+    <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+  <aside class="spec"><div class="no">09</div><h2>학교 리그 중계</h2><p class="one">스포츠 중계 화면. 큰 등번호 · 전광판 숫자 · 순위표가 홈의 중심.</p>
+    <h3>색</h3><div class="sws"><i style="background:#ffffff" data-c="#ffffff"></i><i style="background:#0f1115" data-c="#0f1115"></i><i style="background:#00b86b" data-c="#00b86b"></i><i style="background:#e9ff00" data-c="#e9ff00"></i><i style="background:#eef0f2" data-c="#eef0f2"></i></div>
+    <h3 style="margin-top:24px">숫자 글꼴 · 오스왈드(Oswald) OFL</h3><div class="fs"><span style="font-family:'Oswald';font-weight:700">03 · 1,150</span> <span style="font-weight:900">오늘 20단어</span></div><div class="fn">한글은 Pretendard 900 · 숫자만 Oswald(라틴, 약 30KB)</div>
+    <h3>버튼</h3><div class="bt"><a class="i-go" href="#"><b>경기 시작 · 20단어</b><span>+200</span></a></div>
+    <p class="ref">참고: 스포츠 중계 그래픽, 브롤스타즈 랭크, 토스의 큰 숫자</p></aside>
+</div>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo');</script>
+</body>
+</html>

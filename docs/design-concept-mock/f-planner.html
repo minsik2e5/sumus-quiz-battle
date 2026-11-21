@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 F · 플래너 그리드</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+/* ===== F · 플래너 그리드 — 공부 기록 앱 + 모눈 노트 ===== */
+.F { --paper: #f6f7f2; --ink: #16213e; --hi: #c6f432; --blue: #3d5afe; --grid: rgba(22,33,62,.07); background: var(--paper); background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 20px 20px; color: var(--ink); font-family: "Pretendard", sans-serif; }
+.F .mono { font-family: "Orbit", monospace; }
+.F .top { position: absolute; left: 20px; right: 20px; top: 20px; display: flex; justify-content: space-between; font-size: 13px; }
+.F .date { position: absolute; left: 20px; top: 58px; font-size: 13px; color: #55607e; }
+.F h1 { position: absolute; left: 20px; top: 76px; font-size: 30px; font-weight: 900; letter-spacing: -.04em; line-height: 1.15; }
+.F h1 mark { background: linear-gradient(transparent 55%, var(--hi) 55%); color: inherit; padding: 0 2px; }
+.F .ring { position: absolute; left: 20px; top: 172px; width: 170px; height: 170px; }
+.F .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.F .ring circle { fill: none; stroke-width: 14; }
+.F .ring .bg { stroke: rgba(22,33,62,.1); }
+.F .ring .fg { stroke: var(--blue); stroke-dasharray: 440; stroke-dashoffset: 286; stroke-linecap: butt; animation: f-ring 900ms cubic-bezier(.03,.4,.1,1) both; }
+.F .ring .c { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; font-size: 12px; color: #55607e; }
+.F .ring .c b { display: block; font-size: 40px; color: var(--ink); line-height: 1; }
+.F .pet { position: absolute; right: -14px; top: 150px; width: 210px; animation: f-in 500ms 100ms cubic-bezier(.03,.4,.1,1) both; }
+.F .note { position: absolute; right: 22px; top: 336px; padding: 6px 10px; background: var(--hi); font-size: 13px; font-weight: 800; transform: rotate(-3deg); }
+.F .table { position: absolute; left: 20px; right: 20px; top: 382px; border-top: 2px solid var(--ink); }
+.F .tr { display: grid; grid-template-columns: 70px 1fr 64px; align-items: center; height: 46px; border-bottom: 1px solid rgba(22,33,62,.18); font-size: 15px; font-weight: 700; }
+.F .tr .k { font-size: 12px; color: #55607e; }
+.F .tr .v { text-align: right; font-size: 17px; }
+.F .bar { height: 10px; background: rgba(22,33,62,.08); margin-right: 12px; }
+.F .bar i { display: block; height: 100%; background: var(--ink); transform-origin: left; animation: f-bar 700ms cubic-bezier(.03,.4,.1,1) both; }
+.F .tr.hl .bar i { background: var(--blue); }
+.F .week { position: absolute; left: 20px; right: 20px; top: 548px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; font-size: 11px; color: #55607e; }
+.F .week i { display: block; height: 30px; margin-bottom: 4px; border: 1.5px solid var(--ink); }
+.F .week i.d { background: var(--ink); } .F .week i.t { background: var(--hi); }
+.f-go { position: absolute; left: 20px; right: 20px; bottom: 100px; height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: var(--blue, #3d5afe); color: #fff; font-size: 17px; font-weight: 800; text-decoration: none; border-radius: 4px; box-shadow: 4px 4px 0 #16213e; transition: transform 100ms, box-shadow 100ms; }
+.f-go:active, .f-go.press { transform: translate(4px, 4px); box-shadow: 0 0 0 #16213e; }
+.f-go span { font-family: "Orbit", monospace; font-size: 15px; }
+.spec .f-go { position: static; }
+.F .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 78px; padding: 0 14px 18px; display: flex; justify-content: space-between; align-items: center; background: var(--paper); border-top: 2px solid var(--ink); }
+.F .tabs a { font-family: "Orbit", monospace; font-size: 13px; color: #55607e; }
+.F .tabs a.on { color: var(--ink); background: var(--hi); padding: 2px 6px; }
+@keyframes f-ring { from { stroke-dashoffset: 440; } }
+@keyframes f-bar { from { transform: scaleX(0); } }
+@keyframes f-in { from { transform: translateY(20px); opacity: 0; } }
+</style>
+</head>
+<body class="board">
+<header><h1>시안 F · 플래너 그리드</h1><p>모눈 노트 위에 오늘 공부량을 숫자 · 표 · 동그란 진행 고리로. 형광펜 연두 한 색. 공부 기록 앱 · 스터디 플래너를 쓰는 고등학생에게 익숙한 화면. <a href="index.html">← 시안 목록</a></p></header>
+<div class="phones">
+  <figure class="shot"><figcaption>홈</figcaption>
+  <div class="phone F" data-screen="home">
+    <div class="top mono"><span>단원고 1-A</span><span>890 코인</span></div>
+    <div class="date mono">2026.11.21 토 · 기말까지 D-12</div>
+    <h1>오늘 목표 <mark>20단어</mark><br>지금 7단어.</h1>
+    <div class="ring"><svg viewBox="0 0 170 170"><circle class="bg" cx="85" cy="85" r="70"/><circle class="fg" cx="85" cy="85" r="70"/></svg><div class="c mono"><span><b>35%</b>7 / 20</span></div></div>
+    <img class="pet" src="../../public/assets/pets/owl-3.webp" alt="">
+    <div class="note">부엉이 진화까지 150</div>
+    <div class="table">
+      <div class="tr hl"><span class="k">이번 주</span><span class="bar"><i style="transform:scaleX(.9)"></i></span><span class="v mono">90</span></div>
+      <div class="tr"><span class="k">연속</span><span class="bar"><i style="transform:scaleX(.4)"></i></span><span class="v mono">12일</span></div>
+      <div class="tr"><span class="k">야차전</span><span class="bar"><i style="transform:scaleX(.66)"></i></span><span class="v mono">4승 2패</span></div>
+    </div>
+    <div class="week mono"><div><i class="d"></i>월</div><div><i class="d"></i>화</div><div><i class="d"></i>수</div><div><i class="d"></i>목</div><div><i class="d"></i>금</div><div><i class="t"></i>토</div><div><i></i>일</div></div>
+    <a class="f-go" href="#">이어서 풀기 <span>13개 남음 →</span></a>
+    <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+  <aside class="spec"><div class="no">06</div><h2>플래너 그리드</h2><p class="one">모눈 노트 + 숫자 · 표 · 진행 고리. 형광펜 연두 한 색, 고정폭 숫자.</p>
+    <h3>색</h3><div class="sws"><i style="background:#f6f7f2" data-c="#f6f7f2"></i><i style="background:#16213e" data-c="#16213e"></i><i style="background:#3d5afe" data-c="#3d5afe"></i><i style="background:#c6f432" data-c="#c6f432"></i></div>
+    <h3 style="margin-top:24px">숫자 글꼴 · 오르빗(Orbit) OFL</h3><div class="fs" style="font-family:'Orbit'">7 / 20 · 35%</div><div class="fn">제목 · 본문 Pretendard 900 · 700</div>
+    <h3>버튼</h3><div class="bt"><a class="f-go" href="#">이어서 풀기 <span>13개 남음 →</span></a></div>
+    <p class="ref">참고: 공부 타이머 · 스터디 플래너 앱, 토스의 큰 숫자, 형광펜 노트</p></aside>
+</div>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo');</script>
+</body>
+</html>

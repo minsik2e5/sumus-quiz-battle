@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 D · 매거진 커버</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+/* ===== D · 매거진 커버 — 오늘의 내가 잡지 표지 ===== */
+.D { --tang: #ff5a1f; --cream: #fff3e2; --ink: #1d1410; --mint: #00c389; background: var(--tang); color: var(--cream); font-family: "Pretendard", sans-serif; }
+.D .mast { position: absolute; left: 14px; right: 14px; top: 38px; font-family: "Gasoek One"; font-size: 104px; line-height: .86; letter-spacing: -.02em; color: var(--cream); animation: d-drop 420ms cubic-bezier(.03,.4,.1,1) both; }
+.D .issue { position: absolute; left: 18px; right: 18px; top: 136px; display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; letter-spacing: .04em; border-top: 2px solid var(--cream); padding-top: 6px; }
+.D .pet { position: absolute; left: 20px; right: -40px; top: 150px; width: 430px; animation: d-in 520ms 80ms cubic-bezier(.03,.4,.1,1) both; }
+.D .line { position: absolute; font-weight: 900; letter-spacing: -.03em; line-height: 1.05; }
+.D .l1 { left: 18px; top: 190px; font-size: 15px; width: 130px; }
+.D .l1 b { display: block; font-family: "Gasoek One"; font-weight: 400; font-size: 46px; line-height: 1; color: var(--ink); }
+.D .l2 { left: 18px; top: 300px; font-size: 15px; width: 120px; }
+.D .l2 b { display: block; font-family: "Gasoek One"; font-weight: 400; font-size: 34px; color: var(--cream); }
+.D .sticker { position: absolute; right: 18px; top: 470px; width: 104px; height: 104px; border-radius: 50%; background: var(--mint); color: var(--ink); display: grid; place-items: center; text-align: center; font-size: 13px; font-weight: 900; transform: rotate(12deg); animation: d-stamp 320ms 420ms cubic-bezier(.3,1.6,.5,1) both; }
+.D .sticker b { display: block; font-family: "Gasoek One"; font-weight: 400; font-size: 30px; line-height: 1; }
+.D .head { position: absolute; left: 18px; right: 18px; top: 560px; font-size: 32px; font-weight: 900; letter-spacing: -.045em; line-height: 1.08; }
+.D .head em { font-style: normal; color: var(--ink); }
+.D .toc { position: absolute; left: 18px; right: 18px; top: 646px; display: grid; grid-template-columns: 1fr 1fr 1fr; border-top: 2px solid var(--cream); }
+.D .toc div { padding: 8px 6px 0 0; font-size: 12px; font-weight: 700; }
+.D .toc b { display: block; font-size: 18px; font-weight: 900; }
+.d-go { position: absolute; left: 18px; right: 18px; bottom: 96px; height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: var(--ink, #1d1410); color: #fff3e2; font-family: "Pretendard"; font-size: 18px; font-weight: 900; letter-spacing: -.02em; text-decoration: none; transition: transform 120ms cubic-bezier(0,0,.15,1); }
+.d-go:active, .d-go.press { transform: translateY(3px); }
+.d-go span { font-family: "Gasoek One"; font-weight: 400; font-size: 22px; color: #ff5a1f; }
+.spec .d-go { position: static; }
+.D .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 80px; padding: 0 16px 20px; display: flex; justify-content: space-between; align-items: center; background: var(--cream); color: var(--ink); }
+.D .tabs a { font-size: 14px; font-weight: 800; opacity: .45; }
+.D .tabs a.on { opacity: 1; text-decoration: underline 3px; text-underline-offset: 6px; }
+@keyframes d-drop { from { transform: translateY(-30px); opacity: 0; } }
+@keyframes d-in { from { transform: translateX(40px) scale(1.06); opacity: 0; } }
+@keyframes d-stamp { from { transform: rotate(-20deg) scale(1.8); opacity: 0; } }
+</style>
+</head>
+<body class="board">
+<header><h1>시안 D · 매거진 커버</h1><p>홈 화면이 "오늘의 나"가 표지인 잡지. 귤색 한 장 + 아주 두꺼운 제목 글꼴 + 펫 사진처럼 크게. 고등학생이 스토리에 올리고 싶은 화면. <a href="index.html">← 시안 목록</a></p></header>
+<div class="phones">
+  <figure class="shot"><figcaption>홈</figcaption>
+  <div class="phone D" data-screen="home">
+    <div class="mast">SUMUS</div>
+    <div class="issue"><span>단원고 1-A · 제 12호</span><span>890 코인</span></div>
+    <img class="pet" src="../../public/assets/pets/tiger-3.webp" alt="">
+    <div class="line l1">이번 주<b>90</b>단어 맞힘</div>
+    <div class="line l2">연속<b>12일</b></div>
+    <div class="sticker"><span><b>3위</b>고1 경험치</span></div>
+    <h1 class="head">범이, 이번 호의 주인공.<br><em>20단어면 진화.</em></h1>
+    <div class="toc"><div>02<b>야차전</b>3명 대기</div><div>03<b>놀이터</b>33판</div><div>04<b>도감</b>22/94</div></div>
+    <a class="d-go" href="#">오늘 단어 펼치기 <span>20</span></a>
+    <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+  <aside class="spec"><div class="no">04</div><h2>매거진 커버</h2><p class="one">오늘의 나 = 잡지 표지. 귤색 한 장, 초굵은 제목, 펫이 표지 모델.</p>
+    <h3>색</h3><div class="sws"><i style="background:#ff5a1f" data-c="#ff5a1f"></i><i style="background:#fff3e2" data-c="#fff3e2"></i><i style="background:#1d1410" data-c="#1d1410"></i><i style="background:#00c389" data-c="#00c389"></i></div>
+    <h3 style="margin-top:24px">제목 글꼴 · 가석(Gasoek One) OFL</h3><div class="fs" style="font-family:'Gasoek One'">오늘 20단어</div><div class="fn">본문 Pretendard 700 · 900 · 한글 2,350자 약 200KB(1굵기)</div>
+    <h3>버튼</h3><div class="bt"><a class="d-go" href="#">오늘 단어 펼치기 <span>20</span></a></div>
+    <p class="ref">참고: 패션 잡지 표지 문법, 말해보카 · 콴다의 초굵은 제목, 인스타 스토리</p></aside>
+</div>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo');</script>
+</body>
+</html>

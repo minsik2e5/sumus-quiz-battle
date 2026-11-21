@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>몬스터 6 · 반짝 카드</title>
+<link rel="stylesheet" href="../mock.css">
+<link rel="stylesheet" href="base.css">
+<style>
+/* ===== 6 · 반짝 카드 — 펫이 반짝이는 수집 카드, 알 상점은 카드 뽑기처럼 ===== */
+.M6 { --deep: #1b1840; --deep2: #2c2766; --gold: #ffd36b; --white: #ffffff; --holo: linear-gradient(125deg, #9ff3ff 0%, #c7b4ff 30%, #ffc6e8 55%, #fff1a8 80%, #9ff3ff 100%); --sub: #b9b3e8;
+  background: radial-gradient(120% 60% at 50% 30%, #4a3fa8 0%, var(--deep2) 40%, var(--deep) 75%); color: var(--white); font-family: "Pretendard", sans-serif; }
+.M6 .dh { font-family: "Do Hyeon", sans-serif; font-weight: 400; }
+.M6 .rays { position: absolute; left: 50%; top: 250px; width: 620px; height: 620px; margin: -310px 0 0 -310px; background: repeating-conic-gradient(rgba(255,255,255,.07) 0 8deg, transparent 8deg 20deg); border-radius: 50%; animation: m6-spin 1400ms cubic-bezier(.03,.4,.1,1) both; }
+.M6 .top { position: absolute; left: 14px; right: 14px; top: 14px; display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: var(--sub); }
+.M6 .top b { color: var(--gold); }
+/* 카드 */
+.M6 .card { position: absolute; border-radius: 18px; padding: 8px; background: linear-gradient(160deg, #fff6d6, var(--gold) 40%, #c98f1e); box-shadow: 0 16px 30px rgba(0,0,0,.4); }
+.M6 .card .in { position: relative; height: 100%; border-radius: 12px; background: #fffdf6; color: #1b1840; overflow: hidden; }
+.M6 .card .hd { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px 4px; }
+.M6 .card .hd b { font-family: "Do Hyeon"; font-weight: 400; font-size: 22px; }
+.M6 .card .hd .hp { font-family: "Do Hyeon"; font-size: 15px; color: #e0453a; }
+.M6 .card .hd .hp small { font-family: "Pretendard"; font-size: 10px; font-weight: 900; margin-right: 2px; }
+.M6 .card .art { position: relative; margin: 0 8px; height: 186px; border-radius: 8px; background: var(--holo); overflow: hidden; box-shadow: inset 0 0 0 2px rgba(27,24,64,.25); }
+.M6 .card .art::after { content: ""; position: absolute; inset: -30%; background: linear-gradient(110deg, transparent 42%, rgba(255,255,255,.85) 50%, transparent 58%); transform: translateX(-80%); animation: m6-shine 1200ms 500ms cubic-bezier(.03,.4,.1,1) both; }
+.M6 .card .art img { position: relative; z-index: 1; display: block; width: 210px; margin: -6px auto 0; }
+.M6 .card .bd { display: flex; gap: 4px; padding: 7px 10px 0; }
+.M6 .card .sk { margin: 7px 10px 0; padding: 8px 10px; border-radius: 8px; background: #f3efff; font-size: 12px; line-height: 1.45; color: #4b4680; }
+.M6 .card .sk b { display: flex; justify-content: space-between; color: #1b1840; font-size: 14px; }
+.M6 .card .sk b span { font-family: "Do Hyeon"; font-weight: 400; color: #e0453a; font-size: 18px; }
+.M6 .card .ft { display: flex; justify-content: space-between; padding: 6px 12px; font-size: 10.5px; font-weight: 800; color: #8a86b0; }
+.M6 .hero { left: 50%; top: 52px; width: 252px; height: 386px; margin-left: -126px; transform: rotate(-3deg); animation: m6-flip 700ms cubic-bezier(.03,.4,.1,1) both; }
+.M6 .back { left: 50%; top: 70px; width: 230px; height: 352px; margin-left: -60px; transform: rotate(9deg); background: linear-gradient(160deg, #6b5ce0, #2c2766); opacity: .85; animation: m6-fan 600ms 100ms cubic-bezier(.03,.4,.1,1) both; }
+.M6 .back::after { content: "S"; position: absolute; inset: 10px; border-radius: 12px; border: 2px solid rgba(255,211,107,.6); display: grid; place-items: center; font-family: "Do Hyeon"; font-size: 64px; color: rgba(255,211,107,.75); }
+.M6 .care { position: absolute; top: 210px; display: grid; gap: 10px; }
+.M6 .care.l { left: 10px; }
+.M6 .care a { width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; background: rgba(255,255,255,.12); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.25); font-size: 10.5px; font-weight: 800; text-align: center; line-height: 1.1; }
+.M6 .care img { width: 30px; height: 30px; display: block; margin: 0 auto 1px; }
+.M6 .shelf { position: absolute; left: 12px; right: 12px; top: 456px; display: grid; grid-template-columns: 1.15fr 1fr; gap: 8px; }
+.M6 .tile { border-radius: 18px; padding: 12px; background: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.18); }
+.M6 .tile h3 { font-family: "Do Hyeon"; font-weight: 400; font-size: 18px; }
+.M6 .tile p { margin-top: 2px; font-size: 12px; color: var(--sub); }
+.M6 .eggs { display: flex; gap: 2px; margin-top: 6px; }
+.M6 .eggs img { width: 44px; height: 44px; animation: m6-wob 900ms 600ms ease-in-out 2; }
+.M6 .eggs img:nth-child(2) { animation-delay: 750ms; } .M6 .eggs img:nth-child(3) { animation-delay: 900ms; }
+.M6 .binder { margin-top: 8px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+.M6 .binder i { aspect-ratio: 3/4; border-radius: 3px; background: rgba(255,255,255,.12); }
+.M6 .binder i.f { background: var(--holo); }
+.m6-go { display: flex; align-items: center; justify-content: center; gap: 10px; height: 60px; border-radius: 18px; background: linear-gradient(180deg, #fff0b0, #ffd36b); color: #1b1840; font-family: "Do Hyeon", sans-serif; font-size: 23px; text-decoration: none; box-shadow: 0 5px 0 #b07a12, 0 0 24px rgba(255,211,107,.45); transition: transform 90ms, box-shadow 90ms; }
+.m6-go small { font-family: "Pretendard"; font-size: 13px; font-weight: 800; padding: 3px 9px; border-radius: 99px; background: rgba(27,24,64,.12); }
+.m6-go:active, .m6-go.press { transform: translateY(4px); box-shadow: 0 1px 0 #b07a12, 0 0 34px rgba(255,211,107,.7); }
+.M6 .cta { position: absolute; left: 12px; right: 12px; bottom: 96px; }
+.M6 .stats { position: absolute; left: 12px; right: 12px; top: 610px; display: flex; justify-content: space-around; font-size: 12px; color: var(--sub); text-align: center; }
+.M6 .stats b { display: block; font-family: "Do Hyeon"; font-weight: 400; font-size: 20px; color: var(--white); }
+.M6 .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 80px; padding: 0 12px 20px; display: flex; justify-content: space-around; align-items: center; background: rgba(15,13,40,.92); }
+.M6 .tabs a { font-family: "Do Hyeon"; font-size: 17px; color: #7d77b8; }
+.M6 .tabs a.on { color: var(--gold); }
+
+/* 야차전 카드 대결 */
+.M6 .op { left: 50%; top: 40px; width: 200px; height: 300px; margin-left: -20px; transform: rotate(6deg) scale(.86); transform-origin: top; animation: m6-hit 520ms 520ms both; }
+.M6 .op .art { height: 140px; } .M6 .op .art img { width: 160px; }
+.M6 .op .sk { display: none; }
+.M6 .mine { left: 14px; top: 250px; width: 214px; height: 330px; transform: rotate(-5deg); animation: m6-play 480ms cubic-bezier(.03,.4,.1,1) both; }
+.M6 .mine .art { height: 150px; } .M6 .mine .art img { width: 170px; }
+.M6 .dmg { position: absolute; right: 40px; top: 120px; font-family: "Do Hyeon"; font-size: 46px; color: #ff6a5a; -webkit-text-stroke: 6px #1b1840; paint-order: stroke fill; animation: m6-dmg 800ms 520ms both; }
+.M6 .hpline { position: absolute; left: 16px; top: 70px; width: 140px; font-size: 12px; font-weight: 800; color: var(--sub); }
+.M6 .hpline .b { margin-top: 4px; height: 10px; border-radius: 99px; background: rgba(255,255,255,.15); overflow: hidden; }
+.M6 .hpline .b i { display: block; height: 100%; background: #ff6a5a; transform-origin: left; transform: scaleX(.38); animation: m6-drain 700ms 560ms cubic-bezier(.03,.4,.1,1) both; }
+.M6 .hpline.me { left: auto; right: 16px; top: 470px; width: 130px; } .M6 .hpline.me .b i { background: #4ee08a; transform: scaleX(.86); animation: none; }
+.M6 .qbar { position: absolute; left: 12px; right: 12px; top: 594px; }
+.M6 .qbar p { font-size: 14px; font-weight: 700; color: var(--sub); }
+.M6 .qbar p b { font-family: "Do Hyeon"; font-weight: 400; font-size: 24px; color: var(--white); margin-right: 6px; }
+.M6 .ans { margin-top: 8px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.M6 .ans a { height: 64px; border-radius: 12px; display: grid; place-items: center; text-align: center; padding: 0 4px; font-size: 13px; font-weight: 800; line-height: 1.25; background: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.2); }
+.M6 .ans a.ok { background: var(--holo); color: #1b1840; box-shadow: 0 0 18px rgba(199,180,255,.7); }
+.M6 .ans a.dim { opacity: .4; }
+@keyframes m6-spin { from { transform: rotate(-40deg) scale(.6); opacity: 0; } }
+@keyframes m6-shine { to { transform: translateX(80%); } }
+@keyframes m6-flip { 0% { transform: perspective(900px) rotateY(180deg) rotate(-3deg); opacity: 0; } 40% { opacity: 1; } 100% { transform: perspective(900px) rotateY(0) rotate(-3deg); } }
+@keyframes m6-fan { from { transform: rotate(-3deg) translateX(-60px); opacity: 0; } }
+@keyframes m6-wob { 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
+@keyframes m6-hit { 0%, 100% { transform: rotate(6deg) scale(.86); } 30% { transform: rotate(10deg) scale(.86) translateX(12px); } 60% { transform: rotate(3deg) scale(.86) translateX(-8px); } }
+@keyframes m6-play { from { transform: rotate(-20deg) translateY(160px); opacity: 0; } }
+@keyframes m6-dmg { 0% { transform: scale(.4); opacity: 0; } 30% { transform: scale(1.2); opacity: 1; } 100% { transform: translateY(-14px); opacity: 1; } }
+@keyframes m6-drain { from { transform: scaleX(.6); } }
+</style>
+</head>
+<body class="board">
+<header><h1>몬스터 6 · 반짝 카드</h1><p>펫이 테두리 · 체력 · 특기 칸이 있는 반짝이는 수집 카드가 됩니다(지난 03 홀로 도감을 이 느낌으로 다시). 알 상점은 "알 깨기"로 카드 뽑는 설렘, 야차전은 카드를 내서 겨룸. <a href="index.html">← 몬스터 갈래 목록</a></p></header>
+<div class="phones">
+  <figure class="shot"><figcaption>홈</figcaption>
+  <div class="phone M6" data-screen="home">
+    <div class="rays"></div>
+    <div class="top"><span>단원고 1-A · 연속 12일</span><span>코인 <b>890</b></span></div>
+    <div class="card back"></div>
+    <div class="card hero"><div class="in">
+      <div class="hd"><b>주작</b><span class="hp"><small>체력</small>60</span></div>
+      <div class="art"><img src="../../../public/assets/pets/jujak-3.webp" alt=""></div>
+      <div class="bd"><span class="gb myth">신화</span><span class="tb atk">공격</span><span class="tb dot">지속</span></div>
+      <div class="sk"><b>주작의 불길 <span>6+4×3</span></b>바로 6 피해, 3문제 동안 4씩 피해</div>
+      <div class="ft"><span>#080 / 94</span><span>레벨 3 · 진화까지 150</span></div>
+    </div></div>
+    <div class="care l"><a><img src="../../../public/assets/ui/care-pet.webp" alt="">쓰다듬기</a><a><img src="../../../public/assets/ui/care-feed.webp" alt="">밥 주기</a></div>
+    <div class="shelf">
+      <div class="tile"><h3 class="dh">알 깨기</h3><p>알 상점 · 새 알 3종</p><div class="eggs"><img src="../../../public/assets/ui/epic-egg.webp" alt=""><img src="../../../public/assets/ui/mythic-egg.webp" alt=""><img src="../../../public/assets/ui/dino-egg.webp" alt=""></div></div>
+      <div class="tile"><h3 class="dh">카드 바인더</h3><p>22 / 94장 · 칭호 11</p><div class="binder"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i class="f"></i><i></i><i></i><i class="f"></i><i></i><i></i></div></div>
+    </div>
+    <div class="cta"><a class="m6-go" href="#">오늘 단어 20 <small>카드 경험치 +200</small></a></div>
+    <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+
+  <figure class="shot"><figcaption>야차전 (카드를 내서 겨룸)</figcaption>
+  <div class="phone M6" data-screen="second">
+    <div class="rays" style="top:300px"></div>
+    <div class="card op"><div class="in">
+      <div class="hd"><b>백호</b><span class="hp"><small>체력</small>60</span></div>
+      <div class="art"><img src="../../../public/assets/pets/baekho-3.webp" alt=""></div>
+      <div class="bd"><span class="gb myth">신화</span><span class="tb buff">강화</span></div>
+      <div class="ft"><span>이도윤의 카드</span></div>
+    </div></div>
+    <div class="dmg">−12</div>
+    <div class="hpline">상대 체력 23 / 60<div class="b"><i></i></div></div>
+    <div class="card mine"><div class="in">
+      <div class="hd"><b>주작</b><span class="hp"><small>체력</small>52</span></div>
+      <div class="art"><img src="../../../public/assets/pets/jujak-3.webp" alt=""></div>
+      <div class="bd"><span class="tb atk">공격</span><span class="tb dot">지속</span></div>
+      <div class="sk"><b>주작의 불길 <span>4/5</span></b>1문제 더 맞히면 사용</div>
+    </div></div>
+    <div class="hpline me">내 체력 52 / 60<div class="b"><i></i></div></div>
+    <div class="qbar"><p><b>cultivate</b>의 뜻 · 정답! 12 피해</p>
+      <div class="ans"><a class="dim">수확하다</a><a class="ok">재배하다, 기르다</a><a class="dim">보존하다</a><a class="dim">개척하다</a></div></div>
+    <nav class="tabs"><a>홈</a><a>학습</a><a class="on">야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+
+  <aside class="spec"><div class="no">6</div><h2>반짝 카드</h2><p class="one">펫 = 체력 · 특기 칸이 있는 반짝이는 수집 카드. 알 상점은 "알 깨기", 야차전은 카드를 내서 겨룸.</p>
+    <h3>색</h3><div class="sws"><i style="background:#1b1840" data-c="#1b1840"></i><i style="background:#2c2766" data-c="#2c2766"></i><i style="background:#ffd36b" data-c="#ffd36b"></i><i style="background:#fffdf6" data-c="#fffdf6"></i><i style="background:linear-gradient(125deg,#9ff3ff,#c7b4ff,#ffc6e8,#fff1a8)" data-c="반짝"></i></div>
+    <h3 style="margin-top:24px">제목 글꼴 · 도현(Do Hyeon) OFL</h3><div class="fs" style="font-family:'Do Hyeon'">주작의 불길 · 60</div><div class="fn">본문 Pretendard 700 · 800</div>
+    <h3>버튼</h3><div class="bt"><a class="m6-go" href="#">오늘 단어 20 <small>+200</small></a></div>
+    <h3>특기 · 등급 배지</h3><div class="tbs"><span class="tb atk">공격</span><span class="tb def">방어</span><span class="tb heal">회복</span><span class="tb buff">강화</span><span class="tb dot">지속</span><span class="gb myth">신화</span><span class="gb limited">한정</span></div>
+  </aside>
+</div>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo'); if (location.search.includes('solo2')) document.body.classList.add('solo2');</script>
+</body>
+</html>

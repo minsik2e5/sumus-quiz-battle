@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>몬스터 2 · 도감 노트</title>
+<link rel="stylesheet" href="../mock.css">
+<link rel="stylesheet" href="base.css">
+<style>
+/* ===== 2 · 도감 노트 — 번호 · 배지 · 수집률이 홈의 뼈대 ===== */
+.M2 { --bg: #f2f6f8; --card: #ffffff; --teal: #0e9f95; --teal2: #d8f3ef; --ink: #16222c; --sub: #5b6975; --line: #e1e8ec; --coral: #ff6b57; background: var(--bg); color: var(--ink); font-family: "Pretendard", sans-serif; }
+.M2 .ob { font-family: "Orbit", monospace; }
+.M2 .head { position: absolute; left: 16px; right: 16px; top: 16px; display: flex; justify-content: space-between; align-items: center; }
+.M2 .head h1 { font-size: 28px; font-weight: 900; letter-spacing: -.04em; }
+.M2 .head .ic { display: flex; gap: 8px; }
+.M2 .head .ic a { display: flex; align-items: center; gap: 4px; height: 34px; padding: 0 10px 0 4px; border-radius: 12px; background: var(--card); box-shadow: inset 0 0 0 1.5px var(--line); font-size: 13px; font-weight: 800; }
+.M2 .head .ic img { width: 26px; height: 26px; }
+.M2 .rate { position: absolute; left: 16px; right: 16px; top: 62px; display: flex; align-items: center; gap: 12px; }
+.M2 .rate .num { font-family: "Orbit"; font-size: 30px; line-height: 1; }
+.M2 .rate .num small { font-size: 16px; color: var(--sub); }
+.M2 .rate .bar { flex: 1; height: 12px; border-radius: 99px; background: #dde6ea; overflow: hidden; }
+.M2 .rate .bar i { display: block; height: 100%; background: var(--teal); transform-origin: left; transform: scaleX(.234); animation: m2-fill 900ms cubic-bezier(.03,.4,.1,1) both; }
+.M2 .rate .pc { font-size: 13px; font-weight: 800; color: var(--teal); }
+.M2 .partner { position: absolute; left: 12px; right: 12px; top: 104px; height: 232px; border-radius: 22px; background: var(--card); box-shadow: 0 2px 0 var(--line), inset 0 0 0 1.5px var(--line); overflow: hidden; animation: m2-up 420ms cubic-bezier(0,0,.15,1) both; }
+.M2 .partner .ph { position: absolute; left: 0; top: 0; bottom: 0; width: 150px; background: radial-gradient(circle at 50% 46%, #fff 0 30%, var(--teal2) 31% 100%); }
+.M2 .partner .ph img { position: absolute; left: -16px; top: 6px; width: 184px; animation: m2-pet 600ms 120ms cubic-bezier(.3,1.5,.5,1) both; }
+.M2 .partner .ph .no { position: absolute; left: 10px; top: 10px; font-family: "Orbit"; font-size: 13px; color: var(--teal); }
+.M2 .partner .info { position: absolute; left: 162px; right: 12px; top: 12px; }
+.M2 .partner h2 { font-size: 24px; font-weight: 900; letter-spacing: -.03em; display: flex; align-items: center; gap: 6px; }
+.M2 .partner h2 small { font-size: 12px; font-weight: 700; color: var(--sub); }
+.M2 .partner .bd { margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+.M2 .partner .sk { margin-top: 8px; font-size: 12.5px; line-height: 1.45; color: var(--sub); }
+.M2 .partner .sk b { color: var(--ink); }
+.M2 .evo { margin-top: 8px; display: flex; align-items: center; gap: 2px; }
+.M2 .evo i { width: 34px; height: 34px; border-radius: 50%; background: var(--bg); overflow: hidden; display: grid; place-items: center; box-shadow: inset 0 0 0 1.5px var(--line); }
+.M2 .evo i.on { box-shadow: inset 0 0 0 2px var(--teal); }
+.M2 .evo img { width: 40px; }
+.M2 .evo span { font-size: 10px; color: #9aa7b1; }
+.M2 .care { position: absolute; left: 162px; right: 12px; bottom: 12px; display: flex; gap: 6px; }
+.M2 .care a { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; height: 36px; border-radius: 12px; background: var(--teal2); color: #0a6e67; font-size: 13px; font-weight: 800; }
+.M2 .care img { width: 22px; height: 22px; }
+.M2 .filt { position: absolute; left: 12px; right: 0; top: 350px; display: flex; gap: 6px; overflow: hidden; }
+.M2 .filt a { flex: none; height: 32px; padding: 0 12px; border-radius: 10px; display: grid; place-items: center; font-size: 13px; font-weight: 800; color: var(--sub); background: var(--card); box-shadow: inset 0 0 0 1.5px var(--line); }
+.M2 .filt a.on { background: var(--ink); color: #fff; box-shadow: none; }
+.M2 .dex { position: absolute; left: 12px; right: 12px; top: 394px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.M2 .ent { position: relative; height: 92px; border-radius: 16px; background: var(--card); box-shadow: inset 0 0 0 1.5px var(--line); overflow: hidden; animation: m2-up 360ms cubic-bezier(0,0,.15,1) both; }
+.M2 .ent img { position: absolute; left: 50%; top: 10px; width: 74px; margin-left: -37px; }
+.M2 .ent.un img { filter: brightness(0); opacity: .12; }
+.M2 .ent .n { position: absolute; left: 7px; top: 5px; font-family: "Orbit"; font-size: 10.5px; color: var(--sub); }
+.M2 .ent .t { position: absolute; left: 0; right: 0; bottom: 5px; text-align: center; font-size: 12px; font-weight: 800; }
+.M2 .ent.un .t { color: #a6b1ba; }
+.M2 .ent.new::after { content: "새"; position: absolute; right: 6px; top: 5px; padding: 1px 5px; border-radius: 6px; background: var(--coral); color: #fff; font-size: 10.5px; font-weight: 900; }
+.m2-go { display: flex; align-items: center; justify-content: space-between; height: 58px; padding: 0 18px; border-radius: 18px; background: #0e9f95; color: #fff; font-size: 17px; font-weight: 900; text-decoration: none; box-shadow: 0 4px 0 #0a7069; transition: transform 90ms, box-shadow 90ms; }
+.m2-go span { font-family: "Orbit"; font-size: 14px; opacity: .9; }
+.m2-go:active, .m2-go.press { transform: translateY(4px); box-shadow: 0 0 0 #0a7069; }
+.M2 .cta { position: absolute; left: 12px; right: 12px; bottom: 96px; }
+.M2 .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 80px; padding: 0 12px 20px; display: flex; justify-content: space-around; align-items: center; background: var(--card); border-top: 1.5px solid var(--line); }
+.M2 .tabs a { font-size: 13px; font-weight: 800; color: #9aa7b1; padding: 8px 10px; border-radius: 12px; }
+.M2 .tabs a.on { color: var(--teal); background: var(--teal2); }
+
+/* 공부: 단어 도감 등록 */
+.M2 .q-top { position: absolute; left: 16px; right: 16px; top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 800; color: var(--sub); }
+.M2 .q-top b { font-family: "Orbit"; color: var(--ink); font-size: 16px; }
+.M2 .wentry { position: absolute; left: 12px; right: 12px; top: 54px; height: 300px; border-radius: 24px; background: var(--card); box-shadow: 0 2px 0 var(--line), inset 0 0 0 1.5px var(--line); padding: 18px; animation: m2-up 420ms cubic-bezier(0,0,.15,1) both; }
+.M2 .wentry .row1 { display: flex; justify-content: space-between; align-items: center; }
+.M2 .wentry .no { font-family: "Orbit"; font-size: 14px; color: var(--teal); }
+.M2 .pos { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 99px; background: #2b3a46; color: #fff; font-size: 12px; font-weight: 800; }
+.M2 .wentry h2 { margin-top: 16px; font-size: 46px; font-weight: 900; letter-spacing: -.03em; line-height: 1; }
+.M2 .wentry .ph { margin-top: 8px; font-size: 15px; color: var(--sub); }
+.M2 .wentry .mean { margin-top: 18px; padding: 12px 14px; border-radius: 14px; background: var(--teal2); font-size: 19px; font-weight: 900; color: #0a6e67; animation: m2-reveal 360ms 200ms cubic-bezier(0,0,.15,1) both; }
+.M2 .wentry .ex { margin-top: 12px; font-size: 14px; line-height: 1.5; color: var(--sub); }
+.M2 .wentry .ex b { color: var(--ink); }
+.M2 .stamp { position: absolute; right: 18px; top: 108px; width: 84px; height: 84px; border-radius: 50%; border: 3px solid var(--coral); color: var(--coral); display: grid; place-items: center; text-align: center; font-size: 14px; font-weight: 900; line-height: 1.1; transform: rotate(-12deg); animation: m2-stamp 300ms 320ms cubic-bezier(.3,1.6,.5,1) both; }
+.M2 .stamp b { display: block; font-family: "Orbit"; font-size: 11px; }
+.M2 .opts { position: absolute; left: 12px; right: 12px; top: 370px; display: grid; gap: 8px; }
+.M2 .opts a { display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 14px; border-radius: 16px; background: var(--card); box-shadow: inset 0 0 0 1.5px var(--line); font-size: 16px; font-weight: 800; }
+.M2 .opts a span { font-family: "Orbit"; font-size: 12px; color: var(--sub); width: 18px; }
+.M2 .opts a.ok { background: var(--teal); color: #fff; box-shadow: none; } .M2 .opts a.ok span { color: #c9f3ee; }
+.M2 .opts a.dim { opacity: .5; }
+.M2 .gain { position: absolute; left: 12px; right: 12px; top: 618px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--sub); font-weight: 700; }
+.M2 .gain img { width: 44px; height: 44px; border-radius: 50%; background: var(--teal2); }
+.M2 .gain b { color: var(--ink); }
+.M2 .gain .bar { flex: 1; height: 10px; border-radius: 99px; background: #dde6ea; overflow: hidden; }
+.M2 .gain .bar i { display: block; height: 100%; background: var(--teal); transform-origin: left; transform: scaleX(.64); animation: m2-fill 800ms 400ms cubic-bezier(.03,.4,.1,1) both; }
+@keyframes m2-fill { from { transform: scaleX(0); } }
+@keyframes m2-up { from { transform: translateY(18px); opacity: 0; } }
+@keyframes m2-pet { from { transform: scale(.6); opacity: 0; } }
+@keyframes m2-reveal { from { transform: scaleY(0); opacity: 0; } }
+@keyframes m2-stamp { from { transform: rotate(-30deg) scale(2); opacity: 0; } }
+</style>
+</head>
+<body class="board">
+<header><h1>몬스터 2 · 도감 노트</h1><p>홈의 뼈대가 도감입니다. 번호 · 특기 배지 · 수집률, 아직 못 만난 펫은 그림자. 파트너 칸에 진화 단계와 쓰다듬기 · 밥 주기. 공부한 단어도 "단어 도감"에 번호로 등록됩니다. <a href="index.html">← 몬스터 갈래 목록</a></p></header>
+<div class="phones">
+  <figure class="shot"><figcaption>홈</figcaption>
+  <div class="phone M2" data-screen="home">
+    <div class="head"><h1>도감</h1><div class="ic"><a><img src="../../../public/assets/ui/titles-hero.webp" alt="">칭호 11</a><a><img src="../../../public/assets/ui/egg-shop.webp" alt="">알 상점</a></div></div>
+    <div class="rate"><span class="num">22<small> / 94</small></span><span class="bar"><i></i></span><span class="pc">23%</span></div>
+    <div class="partner">
+      <div class="ph"><span class="no">#054</span><img src="../../../public/assets/pets/haechi-3.webp" alt=""></div>
+      <div class="info">
+        <h2>해치 <small>파트너 · Lv.3</small></h2>
+        <div class="bd"><span class="gb legend">전설</span><span class="tb atk">공격</span><span class="tb def">방어</span></div>
+        <p class="sk"><b>정의의 뿔</b> · 바로 7 피해, 다음에 받는 공격 −9</p>
+        <div class="evo"><i><img src="../../../public/assets/pets/haechi-0.webp" alt=""></i><span>›</span><i><img src="../../../public/assets/pets/haechi-1.webp" alt=""></i><span>›</span><i><img src="../../../public/assets/pets/haechi-2.webp" alt=""></i><span>›</span><i class="on"><img src="../../../public/assets/pets/haechi-3.webp" alt=""></i></div>
+      </div>
+      <div class="care"><a><img src="../../../public/assets/ui/care-pet.webp" alt="">쓰다듬기</a><a><img src="../../../public/assets/ui/care-feed.webp" alt="">밥 주기</a></div>
+    </div>
+    <div class="filt"><a class="on">전체</a><a>기본</a><a>영웅</a><a>전설</a><a>신화</a><a>한정</a></div>
+    <div class="dex">
+      <div class="ent" style="animation-delay:40ms"><span class="n">001</span><img src="../../../public/assets/pets/cat-3.webp" alt=""><span class="t">고양이</span></div>
+      <div class="ent new" style="animation-delay:80ms"><span class="n">008</span><img src="../../../public/assets/pets/fox-3.webp" alt=""><span class="t">여우</span></div>
+      <div class="ent un" style="animation-delay:120ms"><span class="n">013</span><img src="../../../public/assets/pets/owl-3.webp" alt=""><span class="t">???</span></div>
+      <div class="ent" style="animation-delay:160ms"><span class="n">021</span><img src="../../../public/assets/pets/penguin-3.webp" alt=""><span class="t">펭귄</span></div>
+      <div class="ent un" style="animation-delay:200ms"><span class="n">032</span><img src="../../../public/assets/pets/shark-3.webp" alt=""><span class="t">???</span></div>
+      <div class="ent" style="animation-delay:240ms"><span class="n">047</span><img src="../../../public/assets/pets/tiger-3.webp" alt=""><span class="t">호랑이</span></div>
+      <div class="ent" style="animation-delay:280ms"><span class="n">054</span><img src="../../../public/assets/pets/haechi-3.webp" alt=""><span class="t">해치</span></div>
+      <div class="ent un" style="animation-delay:320ms"><span class="n">061</span><img src="../../../public/assets/pets/cheongryong-3.webp" alt=""><span class="t">???</span></div>
+      <div class="ent" style="animation-delay:360ms"><span class="n">066</span><img src="../../../public/assets/pets/baekho-3.webp" alt=""><span class="t">백호</span></div>
+      <div class="ent un" style="animation-delay:400ms"><span class="n">072</span><img src="../../../public/assets/pets/qilin-3.webp" alt=""><span class="t">???</span></div>
+      <div class="ent" style="animation-delay:440ms"><span class="n">080</span><img src="../../../public/assets/pets/jujak-3.webp" alt=""><span class="t">주작</span></div>
+      <div class="ent un" style="animation-delay:480ms"><span class="n">088</span><img src="../../../public/assets/pets/gumiho-3.webp" alt=""><span class="t">???</span></div>
+    </div>
+    <div class="cta"><a class="m2-go" href="#">오늘 단어 20 · 단어 도감 채우기 <span>128/268</span></a></div>
+    <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+
+  <figure class="shot"><figcaption>단어 공부 (단어 도감 등록)</figcaption>
+  <div class="phone M2" data-screen="second">
+    <div class="q-top"><span>× 그만하기</span><span>3과 · <b>7 / 20</b></span></div>
+    <div class="wentry">
+      <div class="row1"><span class="no">단어 #128</span><span class="pos">동사</span></div>
+      <h2>cultivate</h2>
+      <div class="ph">/ˈkʌltɪveɪt/ · 고1 필수</div>
+      <div class="mean">재배하다, 기르다</div>
+      <p class="ex">She <b>cultivates</b> tomatoes in her small garden.</p>
+    </div>
+    <div class="stamp"><span>등록!<b>128/268</b></span></div>
+    <div class="opts"><a class="dim"><span>1</span>수확하다</a><a class="ok"><span>2</span>재배하다, 기르다</a><a class="dim"><span>3</span>보존하다</a><a class="dim"><span>4</span>개척하다</a></div>
+    <div class="gain"><img src="../../../public/assets/pets/haechi-3-s.webp" alt=""><span>해치 경험치 <b>+10</b></span><span class="bar"><i></i></span></div>
+    <div class="cta"><a class="m2-go" href="#">다음 단어 <span>8/20</span></a></div>
+    <nav class="tabs"><a>홈</a><a class="on">학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+
+  <aside class="spec"><div class="no">2</div><h2>도감 노트</h2><p class="one">번호 · 배지 · 수집률이 홈의 뼈대. 못 만난 펫은 그림자. 단어도 도감에 번호로 등록.</p>
+    <h3>색</h3><div class="sws"><i style="background:#f2f6f8" data-c="#f2f6f8"></i><i style="background:#0e9f95" data-c="#0e9f95"></i><i style="background:#d8f3ef" data-c="#d8f3ef"></i><i style="background:#16222c" data-c="#16222c"></i><i style="background:#ff6b57" data-c="#ff6b57"></i></div>
+    <h3 style="margin-top:24px">번호 글꼴 · 오르빗(Orbit) OFL</h3><div class="fs" style="font-family:'Orbit'">#054 · 22/94</div><div class="fn">제목 · 본문 Pretendard 900 · 800</div>
+    <h3>버튼</h3><div class="bt"><a class="m2-go" href="#">오늘 단어 20 <span>128/268</span></a></div>
+    <h3>특기 · 등급 배지</h3><div class="tbs"><span class="tb atk">공격</span><span class="tb def">방어</span><span class="tb heal">회복</span><span class="tb buff">강화</span><span class="tb dot">지속</span><span class="gb legend">전설</span><span class="gb myth">신화</span><span class="M2"><span class="pos">동사</span></span></div>
+  </aside>
+</div>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo'); if (location.search.includes('solo2')) document.body.classList.add('solo2');</script>
+</body>
+</html>

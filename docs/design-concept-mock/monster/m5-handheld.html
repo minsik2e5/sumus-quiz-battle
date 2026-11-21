@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>몬스터 5 · 휴대용 게임기</title>
+<link rel="stylesheet" href="../mock.css">
+<link rel="stylesheet" href="base.css">
+<style>
+/* ===== 5 · 휴대용 게임기 — 바둑판 바닥 · 대사 창 · ▶ 메뉴 목록, 도트 느낌은 살짝 ===== */
+.M5 { --tile1: #f3eedd; --tile2: #e8e1c8; --ink: #2b2a3a; --win: #fffdf5; --line: #2b2a3a; --mint: #5cc9a7; --berry: #e8566c; --sub: #6d6a80;
+  background: var(--tile1); background-image: linear-gradient(45deg, var(--tile2) 25%, transparent 25% 75%, var(--tile2) 75%), linear-gradient(45deg, var(--tile2) 25%, transparent 25% 75%, var(--tile2) 75%); background-size: 40px 40px; background-position: 0 0, 20px 20px; color: var(--ink); font-family: "Galmuri11", "Pretendard", monospace; }
+.M5 .win { position: absolute; background: var(--win); border: 3px solid var(--line); box-shadow: inset 0 0 0 3px var(--win), inset 0 0 0 5px var(--line); border-radius: 8px; }
+.M5 .hud { left: 10px; right: 10px; top: 12px; height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; font-size: 13px; }
+.M5 .hud b { font-weight: 700; color: var(--berry); }
+.M5 .rug { position: absolute; left: 40px; top: 120px; width: 200px; height: 200px; background: repeating-linear-gradient(0deg, rgba(92,201,167,.22) 0 10px, rgba(92,201,167,.1) 10px 20px); border: 3px solid rgba(43,42,58,.25); }
+.M5 .pet { position: absolute; left: 34px; top: 92px; width: 220px; image-rendering: auto; animation: m5-bob 1200ms steps(2) 3; }
+.M5 .shadow { position: absolute; left: 82px; top: 290px; width: 126px; height: 18px; border-radius: 50%; background: rgba(43,42,58,.2); }
+.M5 .emo { position: absolute; left: 196px; top: 92px; width: 40px; height: 40px; display: grid; place-items: center; font-weight: 700; font-size: 22px; animation: m5-pop 300ms 500ms steps(3) both; }
+.M5 .menu { right: 10px; top: 76px; width: 136px; padding: 10px 8px; }
+.M5 .menu a { position: relative; display: flex; justify-content: space-between; padding: 7px 6px 7px 20px; font-size: 14px; }
+.M5 .menu a small { font-size: 11px; color: var(--sub); }
+.M5 .menu a.sel::before { content: "▶"; position: absolute; left: 4px; top: 7px; font-size: 11px; animation: m5-cur 700ms steps(2) infinite; animation-iteration-count: 4; }
+.M5 .stat { left: 10px; top: 340px; right: 10px; padding: 12px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 13px; }
+.M5 .stat .nm { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; }
+.M5 .stat .bar { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.M5 .stat .bar span { flex: 1; height: 10px; border: 2px solid var(--line); background: #fff; }
+.M5 .stat .bar i { display: block; height: 100%; background: var(--mint); transform-origin: left; animation: m5-fill 800ms steps(8) both; }
+.M5 .stat .bar.h i { background: #f0a43c; }
+.M5 .dlg { left: 10px; right: 10px; top: 470px; padding: 16px 18px 14px; font-size: 15px; line-height: 1.7; }
+.M5 .dlg .t { display: inline-block; overflow: hidden; white-space: nowrap; vertical-align: bottom; animation: m5-type 1200ms steps(22) both; }
+.M5 .dlg .yn { margin-top: 10px; display: flex; gap: 16px; }
+.M5 .dlg .yn a { position: relative; padding-left: 18px; font-size: 15px; }
+.M5 .dlg .yn a.sel::before { content: "▶"; position: absolute; left: 0; font-size: 12px; top: 2px; }
+.m5-go { display: flex; align-items: center; justify-content: center; gap: 8px; height: 60px; background: #e8566c; color: #fff; font-family: "Galmuri11", monospace; font-weight: 700; font-size: 18px; text-decoration: none; border: 3px solid #2b2a3a; border-radius: 10px; box-shadow: inset 0 -5px 0 #b43449, 0 4px 0 #2b2a3a; transition: transform 60ms steps(1); }
+.m5-go:active, .m5-go.press { transform: translateY(4px); box-shadow: inset 0 -2px 0 #b43449, 0 0 0 #2b2a3a; }
+.M5 .cta { position: absolute; left: 10px; right: 10px; bottom: 94px; }
+.M5 .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 78px; padding: 0 12px 18px; display: flex; justify-content: space-around; align-items: center; background: var(--ink); }
+.M5 .tabs a { font-size: 13px; color: #a5a2b8; }
+.M5 .tabs a.on { color: #fff; }
+.M5 .tabs a.on::before { content: "▶"; font-size: 10px; margin-right: 2px; color: var(--berry); }
+
+/* 공부 */
+.M5 .q-hud { left: 10px; right: 10px; top: 12px; padding: 10px 14px; font-size: 13px; }
+.M5 .q-hud .row { display: flex; justify-content: space-between; }
+.M5 .q-hud .pips { margin-top: 8px; display: flex; gap: 3px; }
+.M5 .q-hud .pips i { flex: 1; height: 8px; border: 2px solid var(--line); }
+.M5 .q-hud .pips i.f { background: var(--mint); }
+.M5 .word { left: 10px; right: 10px; top: 96px; height: 200px; display: grid; place-items: center; text-align: center; }
+.M5 .word h2 { font-size: 40px; font-weight: 700; letter-spacing: .02em; }
+.M5 .word p { margin-top: 6px; font-size: 13px; color: var(--sub); }
+.M5 .word .spr { position: absolute; right: 10px; bottom: 8px; width: 84px; animation: m5-bob 600ms steps(2) 4; }
+.M5 .q-dlg { left: 10px; right: 10px; top: 312px; padding: 14px 18px; font-size: 15px; line-height: 1.7; }
+.M5 .q-dlg b { color: var(--berry); }
+.M5 .list { left: 10px; right: 10px; top: 420px; padding: 8px 10px; }
+.M5 .list a { position: relative; display: flex; justify-content: space-between; padding: 11px 8px 11px 26px; font-size: 16px; border-bottom: 2px dashed rgba(43,42,58,.18); }
+.M5 .list a:last-child { border: 0; }
+.M5 .list a.sel { background: var(--mint); color: #fff; }
+.M5 .list a.sel::before { content: "▶"; position: absolute; left: 8px; font-size: 12px; top: 13px; }
+.M5 .list a.dim { color: #a9a6b8; }
+.M5 .list a span { font-size: 12px; }
+@keyframes m5-bob { 50% { transform: translateY(-6px); } }
+@keyframes m5-pop { from { transform: scale(0); } }
+@keyframes m5-cur { 50% { transform: translateX(3px); } }
+@keyframes m5-fill { from { transform: scaleX(0); } }
+@keyframes m5-type { from { max-width: 0; } to { max-width: 100%; } }
+</style>
+</head>
+<body class="board">
+<header><h1>몬스터 5 · 휴대용 게임기</h1><p>바둑판 바닥 위의 펫, 두 줄 테두리 창, ▶ 커서 메뉴, 한 글자씩 나오는 대사. 도트 글꼴은 글자에만 쓰고 펫 그림은 그대로 고해상도. 밥 주기는 펫이 먼저 말을 거는 식. <a href="index.html">← 몬스터 갈래 목록</a></p></header>
+<div class="phones">
+  <figure class="shot"><figcaption>홈</figcaption>
+  <div class="phone M5" data-screen="home">
+    <div class="win hud"><span>단원고 1-A · 김민지</span><span>코인 <b>890</b></span></div>
+    <div class="rug"></div><div class="shadow"></div>
+    <img class="pet" src="../../../public/assets/pets/gumiho-3.webp" alt="">
+    <div class="emo win">!</div>
+    <nav class="win menu"><a class="sel">단어 <small>20</small></a><a>야차전 <small>3</small></a><a>놀이터 <small>33</small></a><a>도감 <small>22</small></a><a>칭호 <small>11</small></a><a>알 상점</a><a>나</a></nav>
+    <div class="win stat"><div class="nm">미호 <span class="gb myth">신화</span><span class="tb def">방어</span><span class="tb atk">공격</span></div><div class="bar">경험치<span><i style="transform:scaleX(.7)"></i></span></div><div class="bar h">오늘 돌봄<span><i style="transform:scaleX(.5)"></i></span></div><div>레벨 3 · 진화까지 150</div><div>연속 12일 · 고1 3위</div></div>
+    <div class="win dlg"><span class="t">미호가 배고파 보인다. 밥을 줄까?</span><div class="yn"><a class="sel">밥 주기 +10</a><a>쓰다듬기 +10</a><a>나중에</a></div></div>
+    <div class="cta"><a class="m5-go" href="#">▶ 단어 20개 하러 가기</a></div>
+    <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+
+  <figure class="shot"><figcaption>단어 공부 (대사 창 + 커서 목록)</figcaption>
+  <div class="phone M5" data-screen="second">
+    <div class="win q-hud"><div class="row"><span>3과 단어</span><span>7 / 20 · 연속 정답 6</span></div><div class="pips"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="win word"><div><h2>cultivate</h2><p>/ˈkʌltɪveɪt/ · 동사</p></div><img class="spr" src="../../../public/assets/pets/gumiho-3-cheer.webp" alt=""></div>
+    <div class="win q-dlg">딩동! <b>재배하다, 기르다</b> 가 맞았다.<br>미호의 경험치가 10 올랐다!</div>
+    <nav class="win list"><a class="dim">수확하다</a><a class="sel">재배하다, 기르다 <span>정답</span></a><a class="dim">보존하다</a><a class="dim">개척하다</a></nav>
+    <div class="cta"><a class="m5-go" href="#">▶ 다음 단어</a></div>
+    <nav class="tabs"><a>홈</a><a class="on">학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+
+  <aside class="spec"><div class="no">5</div><h2>휴대용 게임기</h2><p class="one">바둑판 바닥 · 두 줄 테두리 창 · ▶ 커서 메뉴 · 한 글자씩 나오는 대사. 도트는 글자에만.</p>
+    <h3>색</h3><div class="sws"><i style="background:#f3eedd" data-c="#f3eedd"></i><i style="background:#2b2a3a" data-c="#2b2a3a"></i><i style="background:#fffdf5" data-c="#fffdf5"></i><i style="background:#5cc9a7" data-c="#5cc9a7"></i><i style="background:#e8566c" data-c="#e8566c"></i></div>
+    <h3 style="margin-top:24px">글꼴 · 갈무리11(Galmuri11) OFL</h3><div class="fs" style="font-family:'Galmuri11'">밥을 줄까?</div><div class="fn">제목 · 본문 모두 갈무리 하나 · 배지만 Pretendard</div>
+    <h3>버튼</h3><div class="bt"><a class="m5-go" href="#">▶ 단어 20개 하러 가기</a></div>
+    <h3>특기 · 등급 배지</h3><div class="tbs"><span class="tb atk">공격</span><span class="tb def">방어</span><span class="tb heal">회복</span><span class="tb buff">강화</span><span class="tb dot">지속</span><span class="gb myth">신화</span><span class="gb hero">영웅</span></div>
+  </aside>
+</div>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo'); if (location.search.includes('solo2')) document.body.classList.add('solo2');</script>
+</body>
+</html>

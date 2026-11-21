@@ -1,0 +1,20 @@
+/* 몬스터 수집 RPG 갈래 공통: 글꼴 · 특기 계열 배지 · 등급 배지 · 견본 카드.
+   배지는 앱에 이미 있는 데이터만 씁니다: 등급(기본 · 영웅 · 전설 · 신화 · 한정)과
+   야차전 특기 효과의 갈래(바로 피해=공격, 받는 공격 줄임=방어, HP 회복=회복, 다음 공격 늘림=강화, 몇 문제 동안=지속). */
+@font-face { font-family: "Jua"; src: url("../../../public/assets/fonts/jua-korean.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Jua"; src: url("../../../public/assets/fonts/jua-latin.woff2") format("woff2"); unicode-range: U+0000-00FF; font-display: swap; }
+
+.tb { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px 0 8px; border-radius: 99px; font: 800 12px/1 "Pretendard", sans-serif; color: #fff; letter-spacing: -.01em; white-space: nowrap; }
+.tb::before { content: ""; width: 10px; height: 10px; background: #fff; flex: none; }
+.tb.atk { background: #f0553a; } .tb.atk::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.tb.def { background: #3b7cf0; } .tb.def::before { clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%); }
+.tb.heal { background: #22b268; } .tb.heal::before { clip-path: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%); }
+.tb.buff { background: #f29a0c; } .tb.buff::before { clip-path: polygon(50% 0, 100% 50%, 70% 50%, 70% 100%, 30% 100%, 30% 50%, 0 50%); }
+.tb.dot { background: #8a5cf0; } .tb.dot::before { border-radius: 50%; box-shadow: inset 0 0 0 3px #8a5cf0; }
+.gb { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; font: 800 11.5px/1 "Pretendard", sans-serif; letter-spacing: .02em; }
+.gb.basic { background: #e6e9ef; color: #4a5263; } .gb.hero { background: #dff3ff; color: #1662a8; }
+.gb.legend { background: #fff0c9; color: #8a5a00; } .gb.myth { background: linear-gradient(90deg, #ffe3f1, #e6e0ff, #d9f6ff); color: #5a2ea6; }
+.gb.limited { background: #1d1d26; color: #ffd76a; }
+
+.spec .tbs { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.spec .sws i::after { font-size: 9px; }

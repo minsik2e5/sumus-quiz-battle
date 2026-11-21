@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>디자인 컨셉 시안 10방향</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+.list { max-width: 1260px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.list a { display: block; background: #fff; border-radius: 14px; padding: 16px 18px; color: inherit; text-decoration: none; }
+.list .n { font-size: 34px; font-weight: 900; letter-spacing: -.04em; line-height: 1; }
+.list b { display: block; margin-top: 6px; font-size: 19px; font-weight: 800; }
+.list p { margin-top: 4px; font-size: 14px; line-height: 1.5; color: #45454d; }
+.list i { display: flex; height: 12px; margin-top: 12px; border-radius: 3px; overflow: hidden; }
+.list i s { flex: 1; }
+.list em { display: inline-block; margin-top: 8px; font-size: 12px; font-style: normal; font-weight: 700; color: #6b6b73; }
+</style>
+</head>
+<body class="board">
+<header>
+  <h1>SUMUS VOCA 디자인 컨셉 시안 · 고등학생 기준 · 10방향</h1>
+  <p>방향마다 홈 화면 1개 + 색 · 제목 글꼴 · 버튼 견본. 01~03은 단어 공부 · 야차전 화면까지 있습니다. 폭 390px 정적 화면이고 실제 앱과 연결되지 않습니다. 조사와 추천은 <code>docs/design-concept-research-hs.md</code>.</p>
+</header>
+<div class="list" id="list"></div>
+<script>
+const D = [
+  ['01','스트릿 HUD','a-street','검정 + 빨강 한 색, 기울어진 굵은 글자. 대전 게임처럼 지금 할 것 하나만 크게.',['#0e0e11','#ff4655','#f5e663','#f2f0ea'],1],
+  ['02','코발트 포커스','b-cobalt','진한 파랑 면 + 흰 큰 글자 한 문장. 공부 화면은 흰 바탕에 문제만.',['#2f45ff','#ffffff','#0d1240','#ffe14d'],1],
+  ['03','홀로 도감','c-archive','펫과 단어를 수집 카드로. 진주빛 바탕, 홀로 빛은 보상에만, 세리프 제목.',['#eeedf3','#1c1a27','#c9b8ff','#ffc9de'],1],
+  ['04','매거진 커버','d-magazine','오늘의 나 = 잡지 표지. 귤색 한 장, 초굵은 제목, 펫이 표지 모델.',['#ff5a1f','#fff3e2','#1d1410','#00c389']],
+  ['05','월광 RPG','e-moonlight','밤하늘 남색 + 금빛 가는 선. 펫이 달 앞 주인공, 메뉴는 양옆 마름모.',['#0b1020','#d9b56a','#eef1ff','#5fe3d0']],
+  ['06','플래너 그리드','f-planner','모눈 노트 + 숫자 · 표 · 진행 고리. 형광펜 연두 한 색.',['#f6f7f2','#16213e','#3d5afe','#c6f432']],
+  ['07','팝 스티커','g-sticker','스토리 스티커 감성. 라일락 + 핑크 + 연두, 두꺼운 검은 테두리.',['#b9a7ff','#ff4fa3','#d4ff3a','#121212']],
+  ['08','픽셀 아케이드','h-pixel','도트 글꼴 + 큰 점수 칸 "90 × 12". 각진 픽셀 테두리, 계단식 움직임.',['#141a33','#1f6f5c','#3b8cff','#ff4d4d','#ffcf4a']],
+  ['09','학교 리그 중계','i-league','스포츠 중계 화면. 큰 등번호 · 전광판 숫자 · 순위표가 홈의 중심.',['#ffffff','#0f1115','#00b86b','#e9ff00']],
+  ['10','다꾸 노트','j-diary','줄 노트 + 폴라로이드 + 테이프 + 포스트잇, 손글씨 할 일 목록.',['#fbf8f1','#2b2a33','#ff7a8a','#8fc3ff','#ffd9a8']],
+];
+document.getElementById('list').innerHTML = D.map(([n, nm, f, one, cs, full]) =>
+  `<a href="${f}.html"><span class="n">${n}</span><b>${nm}</b><p>${one}</p><i>${cs.map(c => `<s style="background:${c}"></s>`).join('')}</i>${full ? '<em>홈 · 단어 공부 · 야차전</em>' : '<em>홈</em>'}</a>`).join('');
+</script>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo');</script>
+</body>
+</html>
