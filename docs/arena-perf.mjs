@@ -172,6 +172,8 @@ async function main() {
   me.on('pageerror', e => console.error('[pageerror]', e.message));
   await me.addInitScript(AUTOPLAY);
   await me.addInitScript(PROBE);
+  // V13.240 --init '식': 페이지가 열리기 전에 돌릴 식(실험 · 비교용, 예: 'window.__arenaFloorCanvas = 1').
+  if (arg('init', '')) await me.addInitScript(arg('init', ''));
   const LITE = arg('lite', 'off');
   await me.addInitScript(mode => { try { if (mode === 'off') localStorage.removeItem('sumus-arena-lite'); else if (mode === 'on') localStorage.setItem('sumus-arena-lite', String(Date.now())); } catch {} }, LITE);
   // --lite off: 자동 단계도 못 켜게 막는다(보통 연출 그대로 잰다).

@@ -1,0 +1,4 @@
+/* V13.246 게임 렉 점검(docs/game-lag-2026-11.md) */
+
+/* 짝 맞추기 시계: 0.01초마다 바뀌는 글자 칸의 크기를 고정해, 글자가 바뀌어도 배치 다시 계산이 이 칸 밖으로 번지지 않게(모습은 같다) */
+#mt-clock b{display:block;width:100%;height:1em;text-align:center;contain:size layout style}

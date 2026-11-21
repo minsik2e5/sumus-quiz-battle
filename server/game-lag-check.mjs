@@ -1,6 +1,5 @@
 // V13.246 게임 렉 점검(docs/game-lag-2026-11.md)에서 고친 것이 되돌아가지 않게 막는 검사.
-//   규칙: 판 중 프레임마다 (1) 큰 DOM을 통째로 다시 쓰지 않는다 (2) 같은 값은 다시 쓰지 않는다
-//         (3) 넓은 영역의 끝없는 애니메이션은 opacity · transform만 움직인다 (4) 판 중에 처음 쓰는 그림은 미리 디코드한다.
+//   규칙: 판 중 프레임마다 (1) 큰 DOM을 통째로 다시 쓰지 않는다 (2) 같은 값은 다시 쓰지 않는다 (3) 요소를 프레임마다 다시 찾지 않는다.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -34,22 +33,12 @@ export async function runGameLagChecks(assert) {
     assert(tick.includes('M.clockEl?.isConnected') && tick.includes('txt !== M.clockTxt') && hud.includes('off !== M.ringOff') && hud.includes('M.ringFill?.isConnected'), '짝 맞추기 tick · hud: 요소를 프레임마다 찾지 않고 값이 바뀔 때만 쓴다');
     assert(/#mt-clock b\{[^}]*contain:size layout style/.test(css), '짝 맞추기 시계 칸: 크기 고정 + contain(글자가 바뀌어도 배치가 칸 밖으로 번지지 않음)');
   }
-  // 3) 인형뽑기: 집게 위치는 같은 값이면 다시 쓰지 않는다, 판 시작 때 집게 · 인형 자세 그림을 미리 디코드
-  {
-    const js = source('../public/modules/claw.js'), draw = fnBody(js, 'drawClaw'), warm = fnBody(js, 'warmArt');
-    assert(draw && !/(rail|car|cable|claw|sh)\.style\.\w+\s*=/.test(draw) && draw.includes("sty(claw, 'top'") && js.includes('const sty = (el, k, v) =>'), '인형뽑기 drawClaw: 스타일은 sty()로(같은 값이면 건너뜀)');
-    assert(warm && warm.includes('.decode?.()') && warm.includes("['grab', 'fall', 'joy']") && js.includes('warmArt(C.dolls);'), '인형뽑기: 판 시작 때 집게 · 인형 자세 그림을 미리 받아 디코드한다');
-  }
-  // 4) 넓은 영역의 끝없는 애니메이션은 opacity · transform만(box-shadow · background-position을 움직이지 않는다)
+  // 3) 새 CSS가 묶음에 들어 있고, 움직임을 새로 만들지 않는다
   {
     const css = source('../public/v13246.css'), build = source('./build-assets.mjs');
-    assert(build.includes('"v13246.css"'), 'v13246.css가 CSS 묶음에 들어 있다');
-    const frames = [...css.matchAll(/@keyframes\s+([\w-]+)\s*\{((?:[^{}]*\{[^}]*\})*)\s*\}/g)];
-    assert(frames.length >= 5 && frames.every(m => [...m[2].matchAll(/\{([^}]*)\}/g)].every(k => k[1].split(';').filter(Boolean).every(d => /^\s*(opacity|transform)\s*:/.test(d)))), 'v13246.css의 @keyframes는 opacity · transform만 움직인다');
-    assert(/\.wl-app\.fever \.wl-edge\{animation:none\}/.test(css) && /\.rps-show\.tense \.rps-vignette\{animation:none/.test(css) && /\.cw-glitter\{[^}]*animation:none/.test(css), '벽 통과 피버 테두리 · 가위바위보 긴장 테두리 · 인형뽑기 반짝이: 예전의 칠하기 애니메이션을 끈다');
-    assert(css.includes('.wl-edge::after{box-shadow:inset 0 0 0 5px #ff6b6b,inset 0 0 70px rgba(255,80,160,.75);opacity:0}') && css.includes('box-shadow:inset 0 0 110px rgba(255,40,70,.6)') && css.includes('background-size:90px 110px') && css.includes('background-size:140px 120px'), '모습은 그대로: 그림자 색 · 크기, 반짝이 무늬 크기가 예전과 같다');
+    assert(build.includes('"v13246.css"') && !/@keyframes|animation:|transition:/.test(css), 'v13246.css가 CSS 묶음에 들어 있고 새 애니메이션이 없다');
   }
-  // 5) 측정 도구가 있다(다음 점검 때 같은 방법으로 잰다)
+  // 4) 측정 도구가 있다(다음 점검 때 같은 방법으로 잰다)
   {
     const gp = source('../docs/game-perf.mjs'), dr = source('../docs/game-perf-drivers.mjs');
     assert(gp.includes('heap_mb') && gp.includes('after_exit') && gp.includes('Emulation.setCPUThrottlingRate') && ['match', 'wall', 'timing', 'fishing', 'claw', 'rps', 'yabawi', 'hunt', 'yacha', 'monster'].every(g => dr.includes(`driver('${g}'`)), 'docs/game-perf.mjs: 게임 10개를 같은 조건으로 재는 공통 측정 스크립트');

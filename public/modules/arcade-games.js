@@ -193,7 +193,7 @@ export function gamesSection(A, art) {
 export function partyRow() {
   return `<section class="ag-party" aria-label="교실 게임 참가">
     <span class="ag-party-copy"><b>교실 게임 참가</b><small>TV에 나온 번호 4자리</small></span>
-    <form class="ag-join" onsubmit="return false"><input id="gm-code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000" aria-label="방 번호 4자리"><button type="button" class="yl-cta" data-action="arcade-party">들어가기</button></form>
+    <form class="ag-join"><input id="gm-code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000" aria-label="방 번호 4자리"><button type="button" class="yl-cta" data-action="arcade-party">들어가기</button></form>
   </section>`;
 }
 

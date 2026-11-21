@@ -249,15 +249,6 @@ function swingStep() {
   if (dt > 0) k.sway = C.pend.step(dt, floorAt(k.x, k.y).left * W / 100) + (k.wob || 0);
 }
 const physPause = ms => { if (!C?.P) return; C.physScale = 0; physRun(); later(() => { C.physScale = 1; }, ms); };
-const sty = (el, k, v) => { const m = el.__sty ||= {}; if (m[k] === v) return; m[k] = v; el.style[k] = v; };
-// V13.245 판 중에 처음 나오는 그림(집게 · 문 · 반짝이, 이 판 인형의 잡힘 · 떨어짐 · 기쁨 자세)을 판 시작 때 미리 받아 디코드해 둔다 → 집게를 내리는 순간 디코드로 끊기지 않게.
-//   그림은 C.warm에 잡아 둬서 이 화면에 있는 동안 디코드된 채로 남는다(나가면 같이 풀린다).
-function warmArt(dolls = []) {
-  if (!C) return;
-  const W = C.warm ||= new Map(), add = url => { if (W.has(url)) return; const i = new Image(); i.decoding = 'async'; i.src = url; W.set(url, i); i.decode?.().catch(() => {}); };
-  for (const n of ['claw-open', 'claw-closed', 'claw-grip-back', 'claw-grip-front', 'fx-sparkle', 'fx-jackpot', 'prize-door', 'gold-aura']) if (has(n)) add(src(n));
-  for (const k of new Set(dolls.map(d => d.k))) for (const pose of ['grab', 'fall', 'joy']) add(dollSrc(k, pose));
-}
 // 집게 · 줄 · 받침 · 레일 · 그림자를 지금 상태로.
 function drawClaw() {
   if (!C) return;
@@ -268,17 +259,16 @@ function drawClaw() {
   const w = CLAW_W * p.s;
   const rail = $('cw-rail'), car = $('cw-carriage'), cable = $('cw-cable'), claw = $('cw-claw'), sh = $('cw-shadow');
   if (!claw) return;
-  // V13.245 렉 방지: 같은 값이면 다시 쓰지 않는다(집게가 가만히 있으면 배치 다시 계산이 없다). 이 속성들은 여기서만 쓴다.
-  sty(rail, 'top', `${rt}%`);
-  sty(car, 'left', `${p.left}%`); sty(car, 'top', `${rt}%`); sty(car, 'width', `${w * 0.9}%`);
-  sty(cable, 'left', `${p.left}%`); sty(cable, 'top', `${rt + 1.2}%`); sty(cable, 'height', `${Math.max(0.5, top - rt - 1)}%`);
-  sty(claw, 'left', `${p.left}%`); sty(claw, 'top', `${top}%`); sty(claw, 'width', `${w}%`);
-  sty(claw, 'transform', `translate(-50%, 0) rotate(${k.sway || 0}deg)`);
-  sty(claw, 'zIndex', String(k.held ? 600 : depthZ(k.y, 3)));
+  rail.style.top = `${rt}%`;
+  car.style.left = `${p.left}%`; car.style.top = `${rt}%`; car.style.width = `${w * 0.9}%`;
+  cable.style.left = `${p.left}%`; cable.style.top = `${rt + 1.2}%`; cable.style.height = `${Math.max(0.5, top - rt - 1)}%`;
+  claw.style.left = `${p.left}%`; claw.style.top = `${top}%`; claw.style.width = `${w}%`;
+  claw.style.transform = `translate(-50%, 0) rotate(${k.sway || 0}deg)`;
+  claw.style.zIndex = k.held ? 600 : depthZ(k.y, 3);
   const near = clamp(k.drop, 0, 1);
-  sty(sh, 'left', `${p.left}%`); sty(sh, 'top', `${p.top}%`); sty(sh, 'width', `${w * (1.1 - near * 0.45)}%`); sty(sh, 'opacity', String(0.18 + near * 0.4)); sty(sh, 'zIndex', String(depthZ(k.y, 0) - 1));
+  sh.style.left = `${p.left}%`; sh.style.top = `${p.top}%`; sh.style.width = `${w * (1.1 - near * 0.45)}%`; sh.style.opacity = String(0.18 + near * 0.4); sh.style.zIndex = depthZ(k.y, 0) - 1;
   const ro = $('cw-readout');
-  if (ro && C.phase === 'aim') { const txt = `X ${String(Math.round(k.x * 99)).padStart(2, '0')}  Y ${String(Math.round(k.y * 99)).padStart(2, '0')}`; if (ro.__t !== txt || ro.textContent !== txt) { ro.__t = txt; ro.textContent = txt; } }
+  if (ro && C.phase === 'aim') ro.textContent = `X ${String(Math.round(k.x * 99)).padStart(2, '0')}  Y ${String(Math.round(k.y * 99)).padStart(2, '0')}`;
 }
 // 집게 그림: open · closed · grip(뒤 발톱 → 잡힌 인형 → 앞 발톱).
 function clawPic(state, doll = null) {
@@ -324,7 +314,6 @@ function begin(round, resumed = false) {
   if (!C) return;
   C.round = { ...round };
   C.dolls = round.dolls.map(d => ({ ...d }));
-  warmArt(C.dolls);
   C.won = Number(round.won || 0);
   C.got = C.dolls.filter(d => (C.won >> d.i) & 1).map(d => ({ k: d.k, g: d.g }));
   C.time = resumed ? Math.max(5, Number(round.aim_left || 0)) : CLAW.TIME;

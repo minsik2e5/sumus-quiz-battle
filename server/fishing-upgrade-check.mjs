@@ -34,7 +34,7 @@ export function runFishingUpgradeChecks(assert) {
     && ROD_SHAPE.GUIDES.length === 7 && ROD_SHAPE.BUTT < ROD_SHAPE.CORK[0] && ROD_SHAPE.CORK[1] <= ROD_SHAPE.SHAFT,
     'V13.186 낚싯대 끝 고리 = 줄 끝, 마디 감개 · 고리 7개 · 코르크 · 손잡이 끝이 단계 색으로 그려진다');
   const ui = source('../public/modules/reel.js'), css = source('../public/v13154.css');
-  assert(ui.includes("$('rl-rodv').innerHTML = rodSvg(g, R.look || rodLook(1), reduced() ? 0 : performance.now());") && ui.includes('svg.dataset.look = `${L.guide}-${L.butt}`;') && ui.includes('paintRod();\n}\n// V13.154 낚싯대 단계')
+  assert(ui.includes("html = rodSvg(g, L, reduced() ? 0 : L.sparkle ? Math.floor(performance.now() / 33) * 33 : 0);") && ui.includes('patchSvg(rv, html)') && ui.includes('svg.dataset.look = `${L.guide}-${L.butt}`;') && ui.includes('paintRod();\n}\n// V13.154 낚싯대 단계')
     && [1, 2, 3, 4, 5].every(l => existsSync(pub(`assets/fishing/${l > 1 ? `pov-reel-t${l}` : 'pov-reel'}.webp`))) && /\.rl-rig\.img-reel \.rl-reel-g \.spool/.test(css) && !ui.includes('rodPieceMatrix'),
     'V13.186 낚시 화면은 매 프레임 벡터 낚싯대(data-look)를 그리고, 릴은 단계별 릴 그림. 장면을 그릴 때 · 강화할 때 바로 바뀐다');
   // 손맛 연출(입질 · 끌어당김 · 줄 끊김)은 같은 낚싯대 곡선을 쓴다.

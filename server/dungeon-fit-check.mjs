@@ -23,7 +23,11 @@ export function runDungeonFitChecks(assert) {
     assert(steps.every((v, i) => i === 0 || v >= steps[i - 1]) && steps.at(-1) === 4, `V13.185 문제 글이 길어질수록 단계가 올라가고 4에서 멈춘다(${kind})`);
   }
   const meanOptions = words.map(w => String(w.meaning ?? '').trim()).filter(Boolean).sort((a, b) => textUnits(b) - textUnits(a)).slice(0, 6);
-  const engOptions = words.map(w => displayEnglish(w.word)).filter(Boolean).sort((a, b) => textUnits(b) - textUnits(a)).slice(0, 6);
+  // V13.243.1: 데이터에서 가장 길던 영어 칸(선부고 52번에 뜻이 붙어 있던 것)을 고쳐서, 지금 데이터의 영어는 모두 두 줄 안에 든다.
+  // 아주 긴 영어 보기 단계(ft2)는 고정 예시로 검사한다(앞으로 긴 구문이 들어와도 같은 규칙).
+  const engOptions = ['take something into careful consideration', 'be on the verge of making a decision', 'know like the back of one’s hand',
+    "in one's attempt+to부정사", "by the skin of one's teeth", 'take a turn for the worse'];
+  assert(words.every(w => optionFit([displayEnglish(w.word)], 'eng', 4) <= 2), 'V13.243.1 데이터의 영어 보기는 모두 정해진 단계 안에 든다');
   for (const n of [4, 5, 6]) {
     assert(optionFit(meanOptions.slice(0, n), 'mean', n) === 2 && optionFit(engOptions.slice(0, n), 'eng', n) === 2, `V13.185 보기 ${n}개가 모두 긴 경우(뜻 · 영어)는 두 칸 · 여러 줄 단계(ft2)`);
     assert(optionFit(['반대자', '실험', '주장하다', '현대의', '원인', '감소'].slice(0, n), 'mean', n) === 0 && optionFit(['cause', 'argue', 'modern', 'medicine', 'decline', 'advance'].slice(0, n), 'eng', n) <= 1, `V13.185 짧은 보기 ${n}개는 한 줄(ft0)`);
