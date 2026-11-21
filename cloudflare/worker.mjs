@@ -20,10 +20,11 @@ import { hashToken } from '../server/auth.mjs';
 import { createMutationCoordinator, NO_MUTATION, isQuickWrite, quickOwn, quickSettle, readState, isReadPost, isViewPost, tokenUser, tokenOwner } from '../server/mutation-coordinator.mjs';
 import { createLocalRepository, createSupabaseSync, backupState } from './local-first.mjs';
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
-import { WRITE_WARN_PCT } from './cf-limits.mjs';
+import { WRITE_WARN_PCT, CF_FREE_PLAN, utcDay } from './cf-limits.mjs';
 import { stateBudgetReport, upgradeAdvice } from '../server/perf-budget.mjs';
 import { runArchiveStep, archiveDue, archiveBootAt } from '../server/session-archive.mjs';
 import { createSessionArchive } from './session-archive-store.mjs';
+import { autocleanStep, autocleanDue, autocleanSummary, autocleanReport, pollScale, AUTOCLEAN } from '../server/autoclean.mjs';
 import { testSeedState, applyTestSeed } from '../server/test-seed.mjs';
 
 // V13.144 쓰기 모으기: 저장이 연달아 오면 이 시간(ms) 안에 온 변경을 한 번에 쓴다. V13.168: 70%를 넘으면 이 값,
@@ -237,6 +238,8 @@ export class VocaStateObject {
       // V13.216 지난 연습 기록 답 상세 보관 표(부팅 때 읽지 않는다: server/session-archive.mjs).
       this.archive = createSessionArchive(ctx.storage, { countRows: rows => this.local.countRows(rows) });
       this.archivedAt = archiveBootAt();
+      // V13.244 자동 정리: 켜진 뒤 10분쯤에 처음 살펴본다(server/autoclean.mjs).
+      this.autocleanAt = Date.now() - 5 * AUTOCLEAN.EVERY_MS;
       if (this.local.migrationError()) this.bootWarning = `옛 저장 방식으로 읽었어요(옮기기 실패): ${this.local.migrationError()}`.slice(0, 300);
       const syncInterval = Number(env.SUPABASE_SYNC_MIN_INTERVAL_MS ?? SYNC_MIN_INTERVAL_MS);
       // V13.144: 오늘 쓴 양이 90%를 넘으면 백업 간격을 5배로(백업도 줄을 쓴다).
@@ -419,7 +422,16 @@ export class VocaStateObject {
     this.rates.set(bucket, list);
   }
 
+  // V13.244 오늘(UTC) 이 객체가 받은 요청 수. 메모리에만 세므로(쓰기 없음) 객체가 다시 켜지면 0부터다: 대시보드 숫자의 아래쪽 어림값.
+  requestStats(add = 0) {
+    const day = utcDay();
+    if (this.reqs?.day !== day) this.reqs = { day, n: 0, since: Date.now() };
+    this.reqs.n += add;
+    return this.reqs;
+  }
+
   async fetch(request) {
+    this.requestStats(1);
     this.inflight = (this.inflight || 0) + 1;
     try { return await this.handle(request); }
     finally { this.inflight -= 1; this.lastRequestAt = Date.now(); }
@@ -543,6 +555,16 @@ export class VocaStateObject {
         try { await runArchiveStep({ state: this.mutations.current().state, archive: this.archive, mutate: fn => this.mutations.durable(fn), now: Date.now(), mode: archiveMode, noMutation: NO_MUTATION }); }
         catch (error) { console.error('[archive]', error?.message); }
       }
+      // V13.244 자동 정리: 예산의 70%를 넘은 묶음에서 끝난 · 취소된 · 지난 것만 한도 있는 양으로 지운다(server/autoclean.mjs).
+      // 쓰기 한도가 넉넉한 날('ok')만, 이 요청의 답을 기다리게 하지 않고(waitUntil) 저장 줄에 한 번 선다. VOCA_AUTOCLEAN=off 멈춤.
+      if (this.env.VOCA_AUTOCLEAN !== 'off' && this.writeLevel() === 'ok' && autocleanDue(this.autocleanMore, Date.now(), this.autocleanAt)) {
+        this.autocleanAt = Date.now();
+        this.ctx.waitUntil(this.mutations.durable(state => {
+          const entry = autocleanStep(state, Date.now());
+          this.autocleanMore = !!entry?.more;
+          return entry ? true : NO_MUTATION;
+        }).catch(error => console.error('[autoclean]', error?.message)));
+      }
 
       // scrypt takes tens of ms; doing it inside durable() would stall every
       // other student's save while one login is checked.
@@ -639,6 +661,22 @@ export class VocaStateObject {
       }
       if (url.pathname === '/api/health') result.storage = { mode: 'local-first', storage_format: this.local.format(), last_commit_rows: this.local.metrics.commitRows, supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.size || 0) / 1024), state_breakdown: this.sizeReport(), auto_trim: this.mutations.current().state.storageAutoTrim || null, frozen_retries: this.mutations.stats?.().frozen_retries ?? 0, mastery_retries: this.mutations.stats?.().mastery_retries ?? 0, views_kept: this.mutations.stats?.().views_kept ?? 0, supabase_deferred_busy: sync.deferred_busy ?? 0, supabase_yielded_busy: sync.yielded_busy ?? 0, supabase_last_batches: sync.last_batches ?? 0, supabase_last_max_batch_kb: sync.last_max_batch_kb ?? 0, supabase_status: backup.status, supabase_status_text: backup.text, supabase_last_ok_text: backup.last_ok_text, supabase_failing_since: backup.failing_since, supabase_failing_hours: backup.failing_hours, supabase_fail_kind: backup.fail_kind, supabase_guide_url: backup.guide_url, state_budget: stateBudgetReport(this.sizeReport().keys_kb, Math.round((this.local.latest()?.size || 0) / 1024), this.archive.stats()), session_archive: this.mutations.current().state.sessionArchive || null };
       // V13.212 유료 업그레이드 · 데이터 정리가 필요한지 한 줄로(docs/performance-rules.md).
+      // V13.244 자동 정리 내역 · 드라이런(지금 정리하면 줄어드는 양) · 오늘 요청 수(이 객체가 켜진 뒤 센 것).
+      const requestPct = Math.round(this.requestStats().n / CF_FREE_PLAN.requestsPerDay * 1000) / 10;
+      if (url.pathname === '/api/health') {
+        result.storage.autoclean = autocleanReport(this.mutations.current().state);
+        Object.assign(result, { requests_today: this.requestStats().n, requests_pct: requestPct, requests_limit: CF_FREE_PLAN.requestsPerDay, requests_since: this.requestStats().since, poll_scale: pollScale({ writePct: writeStats.pct, requestPct }) });
+      }
+      // 선생님 첫 화면 한 줄("이번 주 자동 정리: …"). 정리한 것이 없으면 없다.
+      if (url.pathname === '/api/bootstrap' && result?.profile?.role === 'teacher') {
+        const week = autocleanSummary(this.mutations.current().state);
+        if (week.text) result.server_autoclean = { text: week.text, kb: week.kb };
+      }
+      // 요청 수 자동 조절: 쓰기 · 요청이 한도의 70%(2배) · 90%(4배)를 넘으면 화면의 자동 새로고침을 느리게 한다(평소에는 칸이 없다).
+      if (url.pathname === '/api/bootstrap' || url.pathname === '/api/battle/invite') {
+        const scale = pollScale({ writePct: writeStats.pct, requestPct });
+        if (scale > 1 && result && typeof result === 'object') result.poll_scale = scale;
+      }
       if (url.pathname === '/api/health') result.storage.upgrade = upgradeAdvice({ writePct: writeStats.pct, budget: result.storage.state_budget });
       const responseHeaders = {
         // Visible in DevTools > Network > Timing, so slow saves can be measured on a real phone.

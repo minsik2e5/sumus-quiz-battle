@@ -259,6 +259,12 @@ export function serverBackupWarning(d) {
   const guide = /^https:\/\/github\.com\//.test(String(w.guide_url || '')) ? ` <a href="${esc(w.guide_url)}" target="_blank" rel="noopener">안내서 보기</a>` : '';
   return `<div class="server-write-warning-v13144 defer backup-warning-v13214" role="status"><b>${esc(w.text)} —${guide}</b><small>학생 기록은 서버에 그대로 저장되고 있어요. 바깥 백업 사본(Supabase)만 멈췄어요${w.detail ? `: ${esc(w.detail)}` : ''}.</small></div>`;
 }
+// V13.244: 서버가 예산을 넘은 묶음에서 끝난 게임 방 같은 것을 자동으로 정리하면 이번 주 내역을 한 줄로 보여 준다.
+export function serverAutoclean(d) {
+  const w = d?.server_autoclean;
+  if (!w?.text) return '';
+  return `<div class="server-autoclean-v13244" role="status"><small>${esc(w.text)} · 학생 기록 · 성적 · 펫 · 코인은 지우지 않아요.</small></div>`;
+}
 function dashboard(A) {
   const d = A.data;
   const care = careGroups(d);
@@ -274,6 +280,7 @@ function dashboard(A) {
   return `
     ${serverWriteWarning(d)}
     ${serverBackupWarning(d)}
+    ${serverAutoclean(d)}
     ${rewardEventEntry()}
     ${timingDailyEntry()}
     ${kpiCards(A, care)}

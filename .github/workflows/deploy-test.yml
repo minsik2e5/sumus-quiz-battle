@@ -31,6 +31,13 @@ jobs:
       - run: npm run build:assets
       - run: npm run check
       - run: npm run check:cloudflare
+      # V13.243 테스트 앱 띠 빌드 표시: 브랜치 끝부분(앞의 pet- 뺌) · 커밋 7자리. 배포 때만 만들고 저장소에는 넣지 않는다(.gitignore).
+      - name: Write test build label
+        shell: bash
+        run: |
+          ref="${GITHUB_REF_NAME##*/}"; ref="${ref#pet-}"
+          printf '{"b":"%s · %s"}' "$ref" "${GITHUB_SHA::7}" > public/test-build.json
+          cat public/test-build.json
       - name: Check Cloudflare credentials
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || (echo "Missing CLOUDFLARE_API_TOKEN repository secret" && exit 1)

@@ -168,9 +168,9 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   // V13.216 같은 부하를 지난 기록 답 상세를 보관으로 다 옮긴 상태에서도 잰다(상한은 같다).
   const tournamentLoad = (archived = false) => runTournamentLoad({ level: 'ok', archived }).then(r => {
     const p95 = key => r[key]?.p95 ?? Infinity;
-    const line = `놀이터 보기 p95 ${Math.max(p95('POST /claw/home'), p95('POST /reel/guide'))}ms · 사냥 첫 화면 p95 ${p95('POST /hunt/home')}ms · ping p95 ${p95('POST /timing/ping')}ms · 대회 판 열기 p95 ${p95('대회 판 열기')}ms · 참가 p95 ${p95('대회 판 참가')}ms · 결과 보고 p95 ${p95('결과 보고')}ms · 펫 대행진 끝 p95 ${p95('POST /runner/finish')}ms · 연습 답 p95 ${p95('연습 답(빠른 길)')}ms · 홈 p95 ${p95('홈 새로고침(GET)')}ms`;
+    const line = `놀이터 보기 p95 ${Math.max(p95('POST /claw/home'), p95('POST /reel/guide'))}ms · 사냥 첫 화면 p95 ${p95('POST /hunt/home')}ms · ping p95 ${p95('POST /timing/ping')}ms · 대회 판 열기 p95 ${p95('대회 판 열기')}ms · 참가 p95 ${p95('대회 판 참가')}ms · 결과 보고 p95 ${p95('결과 보고')}ms · 펫 대행진 끝 p95 ${p95('POST /runner/finish')}ms · 도전 순위 GET p95 ${p95('GET /runner/daily')}ms · 반 보스 GET p95 ${p95('GET /runner/raid')}ms · 연습 답 p95 ${p95('연습 답(빠른 길)')}ms · 홈 p95 ${p95('홈 새로고침(GET)')}ms`;
     assert(r.errors === 0 && r.frozenRetries === 0 && p95('POST /claw/home') < 150 && p95('POST /reel/guide') < 150 && p95('POST /timing/ping') < 50 && p95('POST /hunt/home') < 700
-      && p95('POST /runner/finish') < 400 && p95('대회 판 열기') < 900 && p95('대회 판 참가') < 900 && p95('결과 보고') < 900 && p95('연습 답(빠른 길)') < 300 && r['결과 보고'].n === 16,
+      && p95('POST /runner/finish') < 400 && p95('GET /runner/daily') < 400 && p95('GET /runner/raid') < 400 && p95('대회 판 열기') < 900 && p95('대회 판 참가') < 900 && p95('결과 보고') < 900 && p95('연습 답(빠른 길)') < 300 && r['결과 보고'].n === 16,
       `대회 + 놀이터 부하: ${line} (오류 ${r.errors})`);
     console.log(`[tournament-load] PASS · ${archived ? '보관으로 옮긴 뒤 · ' : ''}${r.kb}KB · ${line} · 저장 ${r.commits}번`);
   });

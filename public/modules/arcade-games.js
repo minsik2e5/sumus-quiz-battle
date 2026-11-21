@@ -154,16 +154,24 @@ export function timingCard(A, art) {
   </article>`;
 }
 // V13.241 펫 대행진: 코드로 그린 카드(하늘 다리 · 정령 무리). 그림 74(runner/entry)가 들어오면 그 그림.
+// V13.243 놀이터 카드 칩: 오늘의 도전 · 반 보스 HP · 받을 보상(첫 화면 요약 숫자만, 요청 없음)
+function runnerMetaChips(v) {
+  const r = v.raid, d = v.daily;
+  if (!r || !d) return '';
+  const chips = [r.claim ? `<li class="hot">반 보스 보상 +${num(r.claim)}</li>` : '', d.best ? '' : '<li>오늘의 도전 아직!</li>', `<li>반 보스 ${r.killed ? '격파!' : `HP ${100 - Math.min(100, r.pct | 0)}%`}</li>`].filter(Boolean);
+  return `<ul class="ag-rn-meta" aria-label="오늘 할 것">${chips.join('')}</ul>`;
+}
 export function runnerCard(A, art) {
-  const v = A.data.rewards?.runner || {}, has = art?.runner?.has?.('entry');
+  const v = A.data.rewards?.runner || {}, has = art?.entry?.has?.('runner');   // v13.243 입구 그림(public/assets/runner/entry.webp)은 ENTRY_ART로(다른 게임과 같게)
   return `<article class="ag-big ag-runner">
     <div class="ag-big-art" aria-hidden="true">${has ? '<img class="ag-big-bg" src="/assets/runner/entry.webp" alt="" draggable="false" decoding="async">' : '<span class="ag-big-bg ag-rn-bg"><i class="ag-rn-road"></i><i class="ag-rn-gate g"><b>×2</b></i><i class="ag-rn-gate b"><b>−5</b></i><i class="ag-rn-crowd"></i><i class="ag-rn-castle"></i></span>'}<span class="ag-big-title"><small>혼자 · 액션 게임</small><strong>펫 대행진</strong><em>정령 무리를 불려 바위를 깨고, 갇힌 내 펫을 구해 성을 무너뜨려요</em></span></div>
     <div class="ag-big-body">
       <ul class="ag-stats" aria-label="내 펫 대행진">
         <li><i class="ag-ico">⭐</i><b>${num(v.total || 0)}</b><small>별</small></li>
-        <li><i class="ag-ico">🏰</i><b>${num(v.st || 0)}/${num(v.stages || 25)}</b><small>스테이지</small></li>
+        <li><i class="ag-ico">🏰</i><b>${num(v.st || 0)}</b><small>스테이지</small></li>
         <li>${coin()}<b>${num(v.coin_today || 0)}/${num(v.coin_daily || 40)}</b><small>오늘 코인</small></li>
       </ul>
+      ${runnerMetaChips(v)}
       <button type="button" class="yl-cta ag-go" data-action="runner-open" aria-label="펫 대행진 들어가기">들어가기</button>
     </div>
   </article>`;
@@ -185,7 +193,7 @@ export function gamesSection(A, art) {
 export function partyRow() {
   return `<section class="ag-party" aria-label="교실 게임 참가">
     <span class="ag-party-copy"><b>교실 게임 참가</b><small>TV에 나온 번호 4자리</small></span>
-    <form class="ag-join" onsubmit="return false"><input id="gm-code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000" aria-label="방 번호 4자리"><button type="button" class="yl-cta" data-action="arcade-party">들어가기</button></form>
+    <form class="ag-join"><input id="gm-code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000" aria-label="방 번호 4자리"><button type="button" class="yl-cta" data-action="arcade-party">들어가기</button></form>
   </section>`;
 }
 

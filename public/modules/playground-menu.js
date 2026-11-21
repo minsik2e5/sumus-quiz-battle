@@ -90,11 +90,12 @@ function records(A, o) {
   ${o.collection()}`;
 }
 
-// 큰 카드(학습의 study-hub-card): 왼쪽 그림, 영어 꼬리표, 제목, 한 줄 설명, 오늘 남은 판, 오른쪽 화살표.
+// 큰 카드(학습의 study-hub-card): 왼쪽 그림, 제목, 한 줄 설명, 오늘 남은 판, 오른쪽 화살표.
+// V13.243.2 뜻 없는 영어 꼬리표(ARCADE · TAJJA · SHOP · RECORD · MARKET)는 뺐다(pill이 비면 그리지 않는다).
 function card(view, pill, title, line, ico, left) {
   return `<button type="button" class="study-hub-card pg-card pg-${view}" data-pg="${view}">
       <span class="study-hub-icon">${ico}</span>
-      <div><span class="pill">${pill}</span><h2>${title}</h2><small class="pg-card-sub">${line}</small>${left ? `<em class="pg-card-left">오늘 ${num(left)}판 남음</em>` : ''}</div>
+      <div>${pill ? `<span class="pill">${pill}</span>` : ''}<h2>${title}</h2><small class="pg-card-sub">${line}</small>${left ? `<em class="pg-card-left">오늘 ${num(left)}판 남음</em>` : ''}</div>
       <span class="study-hub-arrow">${icon('arrow')}</span>
     </button>`;
 }
@@ -103,11 +104,11 @@ function hub(A, o) {
   const r = A.data.rewards || {}, left = tab => total(todayLeft(r, o.yabawi, tab));
   return `${heading('PLAYGROUND', '놀이터')}${wallet(o.balance)}${summary('all', r, o)}
   <div class="study-hub-grid study-hub-simple pg-hub">
-    ${card('arcade', 'ARCADE', '미니게임', '낚시 · 짝 맞추기 · 벽 통과 · 펫 아레나 · 몬스터 사냥 · 인형뽑기 · 10초 맞추기', menuIcon('menu-arcade', '🎮', o.art), left('arcade'))}
-    ${card('tajja', 'TAJJA', '코인 승부', o.yabawi ? '가위바위보 · 야바위' : '가위바위보', menuIcon('menu-tajja', '🃏', o.art), left('tajja'))}
-    ${card('shop', 'SHOP', '상점', '코인 뽑기 · 알 상점', menuIcon('menu-shop', '🛍️', o.art), left('shop'))}
-    ${card('records', 'RECORD', '기록', '게임별 최고 기록 · 도감', recordIcon(), 0)}
-    ${r.market_open ? card('market', 'MARKET', '증권거래소', '지금 열렸어요! 문법 주식을 사고팔아요', '<i class="pg-emoji">📈</i>', 0) : ''}
+    ${card('arcade', '', '미니게임', '낚시 · 짝 맞추기 · 벽 통과 · 펫 아레나 · 몬스터 사냥 · 인형뽑기 · 10초 맞추기 · 펫 대행진', menuIcon('menu-arcade', '🎮', o.art), left('arcade'))}
+    ${card('tajja', '', '코인 승부', o.yabawi ? '가위바위보 · 야바위' : '가위바위보', menuIcon('menu-tajja', '🃏', o.art), left('tajja'))}
+    ${card('shop', '', '상점', '코인 뽑기 · 알 상점', menuIcon('menu-shop', '🛍️', o.art), left('shop'))}
+    ${card('records', '', '기록', '게임별 최고 기록 · 도감', recordIcon(), 0)}
+    ${r.market_open ? card('market', '', '증권거래소', '지금 열렸어요! 문법 주식을 사고팔아요', '<i class="pg-emoji">📈</i>', 0) : ''}
   </div>`;
 }
 // 카드를 누른 화면: 위에 '← 놀이터'(학습의 '← 학습'과 같은 모양)와 코인 지갑. 가위바위보 · 야바위 화면은 '← 코인 승부'.

@@ -24,13 +24,21 @@ export const RUNNER_SFX = {
   'castle-fall': [['rn-castle-fall']],          // 성 무너짐(크게)
   star: [['rn-star']],                          // 별 1~3({ i: 0 · 1 · 2 } → 한 음씩 높게)
   fail: [['rn-fail']],                          // 아깝게 짐(너무 우울하지 않게 끝음이 올라감)
-  start: [['rn-start']]                         // 출발 카운트: 삑 · 삑 · 삑 → START_GO초에 출발!
+  start: [['rn-start']],                        // 출발 카운트: 삑 · 삑 · 삑 → START_GO초에 출발!
+  // v13.242 새 사건 7개: 새 파일 없이 기존 rn-* 소리의 높낮이(rate) · 겹침(at)으로 만든다(효과음 용량 그대로)
+  'wall-hit': [['rn-rock-hit', { rate: .7, gain: .8, vary: .05 }]],                                   // 벽 맞음: 낮고 둔하게
+  'wall-break': [['rn-rock-break', { rate: .72 }], ['rn-castle-hit', { rate: .8, at: .03, gain: .8 }]], // 벽 깨짐: 낮은 와르르 + 쿵
+  clash: [['rn-hammer', { rate: .8 }], ['rn-rock-break', { rate: 1.15, at: .02, gain: .7 }]],          // 정면 충돌: 쿵 + 부서짐
+  'clash-win': [['rn-rescue', { rate: 1.12, gain: .7 }], ['rn-multiply', { rate: .9, at: .05, gain: .6 }]], // 이긴 쪽 함성(팡파르 + 와르르)
+  fever: [['rn-multiply', { rate: 1.25 }], ['rn-star', { rate: 1.5, at: .12 }], ['rn-star', { rate: 2, at: .24 }]], // 피버: 불어남 + 두 음 올라감
+  whirl: [['rn-saw', { rate: .6, gain: .7 }]],                                                        // 모래 소용돌이: 낮은 위잉
+  pillar: [['rn-cannon', { rate: .55 }], ['rn-castle-hit', { rate: .7, at: .05, gain: .7 }]]          // 불기둥: 낮은 펑 + 쿵
 };
 export const START_GO = 1.5; // rn-start 안에서 "출발!"이 나는 때(초): 부르는 쪽이 출발 연출을 여기에 맞춘다
 export const RUNNER_SFX_KEYS = [...new Set(Object.values(RUNNER_SFX).flat().map(([key]) => key))];
 export const SAME_SOUND_GAP_MS = 50;
 export const BIG_HUSH_MS = 150;
-const BIG = new Set(['rock-break', 'rescue', 'castle-fall', 'start']);
+const BIG = new Set(['rock-break', 'rescue', 'castle-fall', 'start', 'wall-break', 'clash', 'fever']);
 const HUSHED = new Set(['shoot', 'rock-hit', 'castle-hit']);
 const STEP = [1, 2 ** (2 / 12), 2 ** (4 / 12)]; // 별 1 · 2 · 3: 도 · 레 · 미처럼 한 음씩
 
@@ -53,10 +61,10 @@ export function runnerSound(event, opts = {}) {
   if (event === 'shoot') more.gain = shootGain(crowd);
   if (event === 'card' && pick) Object.assign(more, { rate: 1.26, gain: .9 });
   if (event === 'star') more.rate = STEP[Math.max(0, Math.min(2, i | 0))];
-  let n = 0;
+  let n = 0; const mine = new Set();   // 한 사건 안에서 같은 파일을 겹쳐 쓰는 것(피버의 별 두 음)은 막지 않는다
   for (const [key, base] of list) {
-    if (now - (lastAt.get(key) ?? -1e9) < gap) continue;
-    lastAt.set(key, now);
+    if (!mine.has(key) && now - (lastAt.get(key) ?? -1e9) < gap) continue;
+    lastAt.set(key, now); mine.add(key);
     if (playSound(key, { ...base, ...more, ...rest })) n++;
   }
   if (n && BIG.has(event)) bigAt = now;

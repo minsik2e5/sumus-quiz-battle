@@ -16,7 +16,7 @@ import { loadState } from './save-load.mjs';
 import { allBooks } from './service.mjs';
 import { createSessionArchive } from '../cloudflare/session-archive-store.mjs';
 import { planArchive, applyArchive } from './session-archive.mjs';
-import { makeMap } from '../public/modules/runner-rules.js';
+import { makeMap, RUNNER } from '../public/modules/runner-rules.js';
 import { botRun } from './runner-sim.mjs';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -102,10 +102,13 @@ export async function runTournamentLoad({ level = 'ok', seconds = 20, others = 8
   const MAP1 = makeMap(1);
   const runner = async id => {
     const n = (runnerN[id] = (runnerN[id] || 0) + 1), rid = `rn-${id}-${n}`.padEnd(8, '0');
-    const st = await timed('POST /runner/start', () => call(id, 'POST', '/runner/start', { id: rid, stage: 1 }));
+    const st = await timed('POST /runner/start', () => call(id, 'POST', '/runner/start', { id: rid, stage: 1, rules: RUNNER.RULES }));
     if (!st?.pet) return;
     const { input } = botRun(MAP1, { start: st.start, pet: { el: st.pet.el, mul: st.pet.mul } }, { skill: 0.8, seed: n });
     await timed('POST /runner/finish', () => call(id, 'POST', '/runner/finish', { id: rid, input }));
+    // V13.243 판 끝 뒤 결과 · 지도 카드에서 오늘의 도전 순위 · 반 보스를 여는 학생(묶음 학생을 훑는 계산은 1분 캐시)
+    if (n % 2) await timed('GET /runner/daily', () => call(id, 'GET', '/runner/daily'));
+    else await timed('GET /runner/raid', () => call(id, 'GET', '/runner/raid'));
   };
   const runnerN = {};
   const gamer = async id => {

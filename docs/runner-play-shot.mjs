@@ -1,7 +1,7 @@
 // V13.241 펫 대행진 실제 화면 한 판 시험 + 스크린샷(검사에는 넣지 않는다). 운영 · 테스트 서버에 연결하지 않는다.
 // 미리: 로컬 서버를 테스트 앱 처음 데이터로 켠다(학생 ts1 / test1234). 예:
 //   node -e "..." 로 server/test-seed.mjs testSeedState()를 DATA_PATH sqlite에 넣고 DATA_PATH=… PORT=8787 node server/index.mjs
-// 사용: node docs/runner-play-shot.mjs [--base http://localhost:8787] [--stage 1] [--out 폴더] [--bad]
+// 사용: node docs/runner-play-shot.mjs [--base http://localhost:8787] [--stage 1] [--out 폴더] [--bad] [--daily(V13.243 반 보스 · 오늘의 도전 창 + 도전 판)]
 //   측정: --perf --cpu 4 --q auto|3|2|1|0 → 폰처럼(390×844 · 배율 3 · 터치, CPU N배) 한 판 동안 프레임을 잰다(docs/arena-fx-perf.mjs와 같은 숫자).
 // 하는 일: 로그인 → 놀이터 → 펫 대행진 카드 → 지도 스크린샷 → 출발 → 간단한 자동 조종(window.__rnAutopilot: 좋은 문 · 바위 · 수정 노리기,
 //   공성전 누르기)으로 끝까지 → 결과 스크린샷. 카드는 첫 장을 누른다. 중간 장면도 몇 장 찍는다.
@@ -16,7 +16,9 @@ const arg = (n, f) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ?
 const BASE = arg('base', 'http://localhost:8787'), OUT = resolve(arg('out', resolve(here, 'docs/screenshots'))), STAGE = Number(arg('stage', 1));
 const pw = (() => { for (const n of [process.env.PLAYWRIGHT, 'playwright'].filter(Boolean)) { try { return require(n); } catch {} } throw Error('playwright가 필요해요'); })();
 await mkdir(OUT, { recursive: true });
-const browser = await pw.chromium.launch({ args: ['--mute-audio'] });
+// --gpu: 캔버스를 GPU 쪽(SwiftShader)에서 그린다 → 진짜 폰처럼 그리기가 메인 스레드 밖으로 빠진다(CPU N배는 스크립트에만 걸림). 없으면 CPU로 그려 진짜 폰보다 불리.
+const GPU = process.argv.includes('--gpu');
+const browser = await pw.chromium.launch({ args: ['--mute-audio', ...(GPU ? ['--enable-gpu', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-accelerated-2d-canvas'] : [])] });
 const PERF = process.argv.includes('--perf'), CPU = Number(arg('cpu', 1)), Q = arg('q', 'auto');
 // --size 1918x628 → PC 가로 화면(마우스), 기본 390×844 폰
 const SIZE = (arg('size', '390x844')).split('x').map(Number), DESK = SIZE[0] > SIZE[1] && SIZE[0] >= 1000;
@@ -31,7 +33,7 @@ await page.addInitScript(q => {
   try { if (q === 'auto') localStorage.removeItem('sumus-runner-tier'); else localStorage.setItem('sumus-runner-tier', JSON.stringify({ t: Number(q), at: Date.now() })); } catch {}
   const P = window.__perf = { frames: [], long: [], on: false }; let last = 0;
   P.siege = 0;   // 공성전 ~ 성 붕괴(결과 화면 전)까지 가장 긴 프레임: 가장 무거운 순간
-  const loop = t => { if (last && P.on) { P.frames.push(t - last); if (window.__rnPhase === 'siege' && t - last > P.siege) P.siege = t - last; } last = t; requestAnimationFrame(loop); }; requestAnimationFrame(loop);
+  const loop = t => { if (last && P.on) { P.frames.push(t - last); if (window.__rnPhase === 'siege') { const res = !!document.querySelector('#rn-result:not([hidden])'); if (!res && t - last > P.siege) P.siege = t - last; if (res && t - last > (P.result || 0)) P.result = t - last; } } last = t; requestAnimationFrame(loop); }; requestAnimationFrame(loop);
   try { new PerformanceObserver(l => { if (P.on) for (const e of l.getEntries()) P.long.push(Math.round(e.duration)); }).observe({ type: 'longtask' }); } catch {}
   // 입력 지연: 손가락(포인터) 움직임이 처리되고 다음 화면 프레임이 시작될 때까지(ms)
   P.lat = []; addEventListener('pointermove', e => { if (!P.on) return; const t0 = e.timeStamp; requestAnimationFrame(t => P.lat.push(t - t0)); }, { capture: true, passive: true });
@@ -46,9 +48,16 @@ await page.addInitScript(() => {
     if (window.__rnBad) return { tx: 0, hold: false };
     window.__rnPhase = S.phase; window.__rnSiegeT = S.siegeT; if (S.phase === 'siege' && !window.__rnN) window.__rnN = S.n;
     if (S.phase === 'siege') return { tx: 0, hold: S.siegeT > 10 };
+    // v13.242: 장면 표시(스크린샷 때) · 적 무리는 정면으로(쏘며 맞섬) · 벽은 틈(있으면) · 움직이는/바뀌는 문은 지금 칸 · 바닥 장애물은 피함
+    const F = window.__rnSeen ||= {}; if (S.clash) F.clash = (F.clash || 0) + 1; if (S.fever > 0) F.fever = (F.fever || 0) + 1;
+    window.__rnS = S;   // 시험용: 지금 판 상태(--debug로 적 무리 · 충돌을 적는다)
+    if (S.clash) return { tx: S.cx };
+    for (const o of S.foes || []) if (!o.done && o.pz - S.z < 26) { F.foe = (F.foe || 0) + 1; return { tx: o.x }; }
+    const tri = p => { const f = p - Math.floor(p); return f < 0.25 ? f * 4 : f < 0.75 ? 2 - f * 4 : f * 4 - 4; };
     for (const o of S.items) {
-      if (o.done || o.z < S.z - 1 || o.z > S.z + 20 || o.type === 'card' || o.type === 'end') continue;
-      if (o.type === 'gate') return { tx: apply(S.n, o.l) >= apply(S.n, o.r) ? -2.2 : 2.2 };
+      if (o.done || o.z < S.z - 1 || o.z > S.z + 20 || o.type === 'card' || o.type === 'end' || o.type === 'slide' || o.type === 'foe') continue;
+      if (o.type === 'gate') { const sw = o.sw && (Math.floor(S.tick / o.sw) & 1), L = sw ? o.r : o.l, Rv = sw ? o.l : o.r, sx = o.mv ? o.mv.amp * tri(S.tick / o.mv.per + o.mv.ph) : 0; return { tx: apply(S.n, L) >= apply(S.n, Rv) ? sx - 1.6 : sx + 1.6 }; }
+      if (o.type === 'wall') { if (o.z - S.z < 12) F.wall = (F.wall || 0) + 1; return { tx: o.gap ? o.gap.x : S.cx }; }
       if (o.type === 'crystal') return { tx: o.x };
       if (o.type === 'rock') return { tx: o.hp < (1 + Math.min(S.n, 400) * 0.028) * (o.z - S.z) * 1.6 ? o.x : (o.x > 0 ? -3 : 3) };
       return { tx: (o.x ?? o.x0) > 0 ? -2.8 : 2.8 };
@@ -84,27 +93,51 @@ if (PERF) { cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setCP
 // 출발 누름 → 판 시작(그림 받기 · 디코드 · 재료 굽기 · 카운트다운 포함)까지 걸린 시간과 그동안 가장 긴 멈춤도 잰다(새 브라우저라 첫 판 디코드 포함).
 if (PERF) await page.evaluate(() => { window.__perf.frames = []; window.__perf.long = []; window.__perf.on = true; window.__perf.t0 = performance.now(); });
 if (PERF && arg('profile-start')) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
-await page.click('[data-rn="go"]');
+// V13.243 --daily: 반 보스 창 · 오늘의 도전 창을 찍고 오늘의 도전 판으로 출발
+if (process.argv.includes('--daily')) {
+  await page.click('[data-rn="raid"]'); await page.waitForTimeout(1200);
+  await page.screenshot({ path: resolve(OUT, 'runner-raid.jpg'), type: 'jpeg', quality: 70 });
+  await page.keyboard.press('Escape'); await page.waitForTimeout(500);
+  await page.click('[data-rn="daily"]'); await page.waitForTimeout(1200);
+  await page.screenshot({ path: resolve(OUT, 'runner-daily.jpg'), type: 'jpeg', quality: 70 });
+  await page.click('[data-rnm="daily-go"]');
+} else await page.click('[data-rn="go"]');
 // 측정: 규칙이 돌기 시작한 순간(카운트다운 뒤)부터 WINDOW초. CPU N배는 출발 전에 걸어 둔다(판 첫 몇 초도 같은 조건).
 const WINDOW = Number(arg('window', 40));
 if (PERF) {
   await page.waitForFunction(() => window.__rnPhase, null, { timeout: 30000 });
   if (arg('profile-start')) { const { profile } = await cdp.send('Profiler.stop'); (await import('node:fs')).writeFileSync(arg('profile-start'), JSON.stringify(profile)); }
   var pre = await page.evaluate(() => ({ ms: Math.round(performance.now() - window.__perf.t0), frame: Math.round(Math.max(0, ...window.__perf.frames)), long: Math.max(0, ...window.__perf.long) }));
+  // --after-emerg: 비상 단계로 내려간 뒤부터 잰다(내려간 때까지 걸린 초를 emerg_s로 적음, 25초 안에 안 내려가면 그대로 잰다)
+  var emergS = null;
+  // --skip 초: 그만큼 지난 뒤부터 잰다(비상 단계 숫자와 같은 구간을 옛 코드로 잴 때)
+  if (arg('skip')) await page.waitForTimeout(Number(arg('skip')) * 1000);
+  if (process.argv.includes('--after-emerg')) { const t9 = Date.now(); await page.waitForFunction(() => window.__rnTier < 0, null, { timeout: 25000 }).then(() => { emergS = Math.round((Date.now() - t9) / 100) / 10; }).catch(() => {}); }
   await page.evaluate(() => { window.__perf.frames = []; window.__perf.long = []; window.__perf.lat = []; window.__perf.on = true; });
   if (arg('profile')) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
   const tEnd = Date.now() + WINDOW * 1000, box = { x: SIZE[0] / 2, y: SIZE[1] * .7 };
-  while (Date.now() < tEnd) { box.x = SIZE[0] / 2 - 45 + Math.random() * 90; await page.mouse.move(box.x, box.y); await page.waitForTimeout(250); if (await page.$('#rn-cards.on')) { await page.click('#rn-cards.on .rn-card', { timeout: 1500 }).catch(() => {}); await page.waitForTimeout(400); } if (await page.$('#rn-result:not([hidden])')) break; }
+  // --shot-at 초 --shot 파일: 측정 중 그 순간 화면 한 장(같은 장면 전후 비교용, 측정 숫자에는 넣지 않을 때만 쓴다)
+  const shotAt = Number(arg('shot-at', 0)), t1 = Date.now(); let shotDone = !shotAt;
+  // 판 중 캔버스 해상도가 바뀐 횟수(선명도가 판 중에 바뀌는지): 0.25초마다 캔버스 크기를 본다
+  var resLog = [];
+  while (Date.now() < tEnd) {
+    { const wh = await page.evaluate(() => { const c = document.getElementById('rn-cvs'); return c && !document.querySelector('#rn-result:not([hidden])') ? c.width + 'x' + c.height : null; }).catch(() => null); if (wh && resLog.at(-1) !== wh) resLog.push(wh); }
+    if (!shotDone && Date.now() - t1 > shotAt * 1000) { shotDone = true; await page.screenshot({ path: resolve(OUT, arg('shot', 'runner-perf-shot.png')) }); } box.x = SIZE[0] / 2 - 45 + Math.random() * 90; await page.mouse.move(box.x, box.y); await page.waitForTimeout(250); if (await page.$('#rn-cards.on')) { await page.click('#rn-cards.on .rn-card', { timeout: 1500 }).catch(() => {}); await page.waitForTimeout(400); } if (await page.$('#rn-result:not([hidden])')) break; }
   await page.evaluate(() => { window.__perf.on = false; });
 }
 const t0 = Date.now(), shots = [[9000, 'runner-play-run.jpg']];
-let cards = 0, shotRescue = false, shotSiege = false;
+let cards = 0, shotRescue = false, shotSiege = false, burstAt = 0, burstN = 0; const shotSeen = {};
 while (!PERF && Date.now() - t0 < 150000) {
   await page.waitForTimeout(120);
   if (await page.$('#rn-result:not([hidden])')) { if (PERF) await page.evaluate(() => { window.__perf.on = false; }); break; }
   if (await page.$('#rn-cards.on')) { await page.waitForTimeout(500); if (cards === 0) await page.screenshot({ path: resolve(OUT, 'runner-play-card.jpg'), type: 'jpeg', quality: 70 }); await page.click('#rn-cards.on .rn-card', { timeout: 1500 }).catch(() => {}); cards++; await page.waitForTimeout(600); }
   const el = Date.now() - t0;
+  if (process.argv.includes('--debug')) console.log(await page.evaluate(() => { const S = window.__rnS; return S ? JSON.stringify({ t: S.tick, z: Math.round(S.z), n: S.n, ph: S.phase, clash: S.clash ? Math.round(S.clash.hp) : null, foes: S.foes.map(o => [Math.round(o.pz), Math.round(o.x * 10) / 10, Math.round(o.hp), o.done]) }) : ''; }));
+  if (arg('every') && el > (burstAt += Number(arg('every')))) await page.screenshot({ path: resolve(OUT, `runner-burst-${String(burstN++).padStart(3, '0')}.jpg`), type: 'jpeg', quality: 60 });   // --every ms: 장면 고르기용 연속 사진
+  else if (arg('every')) burstAt -= Number(arg('every'));
   while (shots.length && el > shots[0][0]) { const [, f] = shots.shift(); await page.screenshot({ path: resolve(OUT, f), type: 'jpeg', quality: 70 }); }
+  const seen = await page.evaluate(() => window.__rnSeen || {}).catch(() => ({}));
+  for (const k of ['wall', 'clash', 'fever']) if (seen[k] >= (k === 'wall' ? 2 : k === 'clash' ? 1 : 12) && !shotSeen[k]) { shotSeen[k] = true; await page.screenshot({ path: resolve(OUT, `runner-play-${k}.jpg`), type: 'jpeg', quality: 70 }); }
   const siegeT = await page.evaluate(() => window.__rnPhase === 'siege' ? window.__rnSiegeT : 0).catch(() => 0);
   if (!shotSiege && siegeT > 24) { shotSiege = true; await page.screenshot({ path: resolve(OUT, 'runner-play-siege.jpg'), type: 'jpeg', quality: 70 }); }
   void shotRescue;
@@ -119,7 +152,7 @@ if (PERF) {
   const fr = P.frames.filter(d => d < 5000), secs = fr.reduce((a, b) => a + b, 0) / 1000, mins = secs / 60, pct = q => { const x = [...fr].sort((a, b) => a - b); return x[Math.min(x.length - 1, Math.floor(x.length * q))] || 0; };
   const r1 = x => Math.round(x * 10) / 10;
   const lat = [...P.lat].sort((a, b) => a - b), lp = q => r1(lat[Math.min(lat.length - 1, Math.floor(lat.length * q))] || 0);
-  perf = { cpu: CPU, q: Q, seconds: r1(secs), fps: r1(fr.length / secs), p95: r1(pct(.95)), p99: r1(pct(.99)), max: r1(Math.max(...fr)), over33_min: r1(fr.filter(d => d > 33.4).length / mins), over50_min: r1(fr.filter(d => d > 50).length / mins), long_tasks: P.long.length, input_p50: lp(.5), input_p95: lp(.95), input_n: lat.length, first5s_over50: (() => { let t = 0, n = 0; for (const d of fr) { t += d; if (t > 5000) break; if (d > 50) n++; } return n; })(), tier_end: ['최저', '낮음', '중간', '높음'][tierEnd], start_ms: pre.ms, siege_max: Math.round(P.siege), crowd_end: await page.evaluate(() => window.__rnN || 0), canvas: await page.evaluate(() => { const c = document.querySelector('#rn-cvs'); return c ? `${c.width}x${c.height}` : ''; }), start_frame_max: pre.frame, start_long_max: pre.long };
+  perf = { res_changes: Math.max(0, (typeof resLog === 'undefined' ? [] : resLog).length - 1), res_log: (typeof resLog === 'undefined' ? [] : resLog).join(' > '), errors: errors.slice(0, 5), emerg_s: emergS, tier_last: await page.evaluate(() => window.__rnTier ?? null), cpu: CPU, q: Q, seconds: r1(secs), fps: r1(fr.length / secs), p95: r1(pct(.95)), p99: r1(pct(.99)), max: r1(Math.max(...fr)), over33_min: r1(fr.filter(d => d > 33.4).length / mins), over50_min: r1(fr.filter(d => d > 50).length / mins), long_tasks: P.long.length, input_p50: lp(.5), input_p95: lp(.95), input_n: lat.length, first5s_over50: (() => { let t = 0, n = 0; for (const d of fr) { t += d; if (t > 5000) break; if (d > 50) n++; } return n; })(), tier_end: ['최저', '낮음', '중간', '높음'][tierEnd], start_ms: pre.ms, siege_max: Math.round(P.siege), result_max: Math.round(P.result || 0), crowd_end: await page.evaluate(() => window.__rnN || 0), canvas: await page.evaluate(() => { const c = document.querySelector('#rn-cvs'); return c ? `${c.width}x${c.height}` : ''; }), start_frame_max: pre.frame, start_long_max: pre.long };
   console.log(JSON.stringify(perf)); await browser.close(); process.exit(0);
 }
 const sounds = await page.evaluate(() => window.__rnSnd).catch(() => null);
