@@ -1,0 +1,20 @@
+trace(ms): UpdateLayoutTree 1757 · RasterTask 1259 · Layerize 1209 · FireAnimationFrame 1156 · Layout 1146 · FunctionCall 958 · Commit 894 · Paint 866 · PrePaint 798 · ImageDecodeTask 163 · HitTest 119 · TimerFire 114 · Decode Image 111 · MajorGC 95 · EventDispatch 42 · ParseHTML 37
+long 2.5s 52ms: UpdateLayoutTree 16 · FireAnimationFrame 8 · FunctionCall 8 · Layerize 1 · HitTest 1
+long 3.0s 42ms: FireAnimationFrame 25 · Layerize 4 · PrePaint 4 · UpdateLayoutTree 3 · Layout 3
+long 5.9s 53ms: FireAnimationFrame 20 · Layout 18 · Layerize 3 · PrePaint 2 · Paint 2
+long 15.0s 56ms: Commit 44 · UpdateLayoutTree 4 · PrePaint 1 · Layerize 1 · PaintImage 1
+long 18.0s 49ms: TimerFire 43 · ParseHTML 1 · FunctionCall 0
+long 18.0s 51ms: Layout 24 · Paint 7 · PrePaint 3 · Layerize 3 · Commit 2
+924 ScheduleStyleRecalculation: (js 아님: CSS 애니메이션 등)
+417 InvalidateLayout: (js 아님: CSS 애니메이션 등)
+289 InvalidateLayout: drawClaw claw.js:272
+10 InvalidateLayout: hud claw.js:158
+7 ScheduleStyleRecalculation: squash claw.js:344
+7 InvalidateLayout: step claw.js:479
+7 ScheduleStyleRecalculation: step claw.js:479
+5 InvalidateLayout: loop claw.js:378
+5 InvalidateLayout: clawPic claw.js:280
+4 InvalidateLayout: (anon) claw.js:769
+4 ScheduleStyleRecalculation: (anon) claw.js:769
+3 InvalidateLayout: mid claw.js:170
+{"game":"claw","cpu":4,"rounds":1,"start_ms":792,"seconds":18.1,"fps":50.9,"p95":33.4,"max":100,"over33_min":142.5,"over50_min":19.9,"first5s_over50":2,"long_tasks":4,"input_p95":19,"style_ms":2458,"layout_ms":780,"layout_count":765,"script_ms":973,"task_ms":11177,"net":{"/api/claw/drop":3},"img":["claw-open.webp","fx-sparkle.webp","claw-grip-back.webp","doll-pig-grab.webp","claw-grip-front.webp","doll-pig-fall.webp","prize-door.webp","doll-pig-joy.webp"],"anims_inf":{"cw-glit-a":1,"cw-glit-b":1,"cw-breathe-l":1,"cw-breathe":17,"cw-spin":1,"cw-dangle":1,"cw-glare":1},"hidden":null,"heap_mb":[4.3,4.5],"nodes":[1048,1084],"listeners":[75,75],"after_exit":{"raf_per_s":0,"intervals":[{"ms":20000,"at":"startInvitePolling (/app.js?v=13.243.0:643:16) < startPolling (/app.js?v=13.243.0:705:3)"},{"ms":120000,"at":"startPolling (/app.js?v=13.243.0:709:10) < $.onsubmit (/app.js?v=13.243.0:386:346)"

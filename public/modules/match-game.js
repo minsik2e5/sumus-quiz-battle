@@ -216,8 +216,9 @@ const elapsed = () => M.start ? performance.now() - M.start + M.misses * MATCH.P
 function tick() {
   if (!M || M.done || M.closing) return;
   const t = elapsed();
-  const el = document.querySelector('#mt-clock b');
-  if (el) el.textContent = (t / 1000).toFixed(2);
+  // V13.245 렉 방지: 시계 글자 · 링 요소는 한 번만 찾고(매 프레임 찾지 않음), 글자는 바뀔 때만 쓴다. 글자 칸은 CSS로 크기를 고정해 배치 다시 계산이 그 칸 안에서 끝난다.
+  const el = M.clockEl?.isConnected ? M.clockEl : (M.clockEl = document.querySelector('#mt-clock b'));
+  if (el) { const txt = (t / 1000).toFixed(2); if (txt !== M.clockTxt) { M.clockTxt = txt; el.firstChild && el.firstChild.nodeType === 3 ? (el.firstChild.nodeValue = txt) : (el.textContent = txt); } }
   hud(t);
   M.raf = requestAnimationFrame(tick);
 }
@@ -225,7 +226,7 @@ function tick() {
 function hud(t) {
   const ringEl = $('mt-ring');
   if (!ringEl) return;
-  ringEl.querySelector('.fill')?.setAttribute('stroke-dashoffset', ringOffset(t));
+  { const fill = M.ringFill?.isConnected ? M.ringFill : (M.ringFill = ringEl.querySelector('.fill')), off = ringOffset(t); if (fill && off !== M.ringOff) { M.ringOff = off; fill.setAttribute('stroke-dashoffset', off); } }
   const lost = t > MATCH.STARS[1] ? 2 : t > MATCH.STARS[0] ? 1 : 0;
   if (lost > M.lost) { // 별 하나가 링에서 떨어져 나간다
     M.lost = lost;

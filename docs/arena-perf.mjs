@@ -205,6 +205,33 @@ async function main() {
     if (SHOT && !shot && Date.now() - started > Number(arg('shot-at', 12000))) { await me.screenshot({ path: SHOT, scale: process.argv.includes('--shot-device') ? 'device' : 'css' }); shot = true; }
     if (await me.evaluate(() => !!window.__perf.t1)) break;
   }
+  // V13.246 --rounds N(혼자 판만): 판을 N번 이어서 한다(결과 → 한 판 더 → 시작). 판마다 끝나고 가비지 수거 뒤 JS 힙 · DOM 수 · 그 판의 fps · 전투 중 50ms↑/분,
+  //   마지막에 나가기를 누르고 3초 동안 도는 requestAnimationFrame(측정용 루프 제외) · setInterval 수를 찍는다. 메모리가 새거나 판이 거듭될수록 느려지는지 본다.
+  const ROUNDS = Number(arg('rounds', 1));
+  if (ROUNDS > 1 && !MODE) {
+    const rounds = [];
+    const one = () => me.evaluate(() => { const P = window.__perf, f = P.frames, pl = P.play || [], ms = f.reduce((a, b) => a + b, 0); return { fps: Math.round(f.length / (ms / 1000) * 10) / 10, o50: Math.round(pl.filter(d => d > 50).length / ((pl.reduce((a, b) => a + b, 0) / 60000) || 1) * 10) / 10, max: Math.round(Math.max(0, ...pl)) }; });
+    const mem = async () => { await cdp.send('HeapProfiler.collectGarbage').catch(() => {}); const m = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(x => [x.name, x.value])); return { heap: r1(m.JSHeapUsedSize / 1048576), nodes: m.Nodes, listeners: m.JSEventListeners }; };
+    for (let r = 0; r < ROUNDS; r++) {
+      if (r > 0) {
+        await me.evaluate(() => { const P = window.__perf; P.frames = []; P.play = []; P.fight = 0; P.t1 = 0; P.on = false; });
+        await me.click('[data-ar="again"]', { timeout: 15000 }); await new Promise(x => setTimeout(x, 800));
+        await me.click('[data-ar="start"]', { timeout: 15000 });
+        await me.waitForSelector('#ar-pad', { timeout: 30000 });
+      }
+      await me.waitForFunction(() => !!window.__perf.t1, null, { timeout: 240000, polling: 1000 });
+      await new Promise(x => setTimeout(x, 1500));
+      rounds.push({ ...(await one()), ...(await mem()) });
+    }
+    await me.click('[data-ar="again"]', { timeout: 15000 }).catch(() => {}); await new Promise(x => setTimeout(x, 800));
+    await me.evaluate(() => { const o = window.requestAnimationFrame, si = window.setInterval, ci = window.clearInterval; window.__x = { raf: 0, iv: new Set() }; window.requestAnimationFrame = function (cb) { if (!/at loop /.test(new Error().stack || '')) window.__x.raf++; return o.call(window, cb); }; window.setInterval = function (...a) { const id = si.apply(window, a); window.__x.iv.add(id); return id; }; window.clearInterval = function (id) { window.__x.iv.delete(id); return ci.call(window, id); }; });
+    await me.click('[data-ar="exit"]', { timeout: 15000 }).catch(() => {});
+    await new Promise(x => setTimeout(x, 500));
+    const a0 = await me.evaluate(() => window.__x.raf); await new Promise(x => setTimeout(x, 3000));
+    const after = await me.evaluate(a0 => ({ raf_per_s: Math.round((window.__x.raf - a0) / 3 * 10) / 10, new_intervals: window.__x.iv.size, arena_left: !!document.getElementById('ar-app') }), a0);
+    console.log(JSON.stringify({ rounds_test: ROUNDS, cpu: CPU, rounds, after_exit: { ...after, ...(await mem()) } }));
+    await browser.close(); server.close(); process.exit(0);
+  }
   // --probe '식': 끝에 페이지에서 식을 돌려 값을 찍는다(화면 확인용).
   if (arg('probe', '')) console.log('probe:', JSON.stringify(await me.evaluate(arg('probe', ''))));
   // --anims: 끝에 돌고 있는 애니메이션(무한 반복 포함) 이름과 대상.

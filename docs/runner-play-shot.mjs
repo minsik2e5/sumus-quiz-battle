@@ -87,7 +87,7 @@ await page.screenshot({ path: resolve(OUT, 'runner-card.jpg'), type: 'jpeg', qua
 await page.click('[data-action="runner-open"]');
 await page.waitForTimeout(1500);
 await page.screenshot({ path: resolve(OUT, 'runner-map.jpg'), type: 'jpeg', quality: 70 });
-if (STAGE > 1) await page.click(`[data-rn="pick"][data-s="${STAGE}"]`).catch(() => {});
+if (STAGE > 1 || arg('user')) await page.click(`[data-rn="pick"][data-s="${STAGE}"]`).catch(() => {});   // 다른 계정(ts2 = 99스테이지까지 열림)은 1스테이지도 눌러서 고른다
 let cdp = null;
 if (PERF) { cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU }); }
 // 출발 누름 → 판 시작(그림 받기 · 디코드 · 재료 굽기 · 카운트다운 포함)까지 걸린 시간과 그동안 가장 긴 멈춤도 잰다(새 브라우저라 첫 판 디코드 포함).
@@ -115,6 +115,8 @@ if (PERF) {
   if (process.argv.includes('--after-emerg')) { const t9 = Date.now(); await page.waitForFunction(() => window.__rnTier < 0, null, { timeout: 25000 }).then(() => { emergS = Math.round((Date.now() - t9) / 100) / 10; }).catch(() => {}); }
   await page.evaluate(() => { window.__perf.frames = []; window.__perf.long = []; window.__perf.lat = []; window.__perf.on = true; });
   if (arg('profile')) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
+  // V13.245 --trace: 판 중 브라우저 일(스타일 · 배치 · 칠하기 · 커밋 · 스크립트)을 종류별 ms로 찍는다(코드가 느린지, 칠하는 넓이가 넓은지 구분)
+  if (process.argv.includes('--trace')) await browser.startTracing(page, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline'] });
   const tEnd = Date.now() + WINDOW * 1000, box = { x: SIZE[0] / 2, y: SIZE[1] * .7 };
   // --shot-at 초 --shot 파일: 측정 중 그 순간 화면 한 장(같은 장면 전후 비교용, 측정 숫자에는 넣지 않을 때만 쓴다)
   const shotAt = Number(arg('shot-at', 0)), t1 = Date.now(); let shotDone = !shotAt;
@@ -124,6 +126,14 @@ if (PERF) {
     { const wh = await page.evaluate(() => { const c = document.getElementById('rn-cvs'); return c && !document.querySelector('#rn-result:not([hidden])') ? c.width + 'x' + c.height : null; }).catch(() => null); if (wh && resLog.at(-1) !== wh) resLog.push(wh); }
     if (!shotDone && Date.now() - t1 > shotAt * 1000) { shotDone = true; await page.screenshot({ path: resolve(OUT, arg('shot', 'runner-perf-shot.png')) }); } box.x = SIZE[0] / 2 - 45 + Math.random() * 90; await page.mouse.move(box.x, box.y); await page.waitForTimeout(250); if (await page.$('#rn-cards.on')) { await page.click('#rn-cards.on .rn-card', { timeout: 1500 }).catch(() => {}); await page.waitForTimeout(400); } if (await page.$('#rn-result:not([hidden])')) break; }
   await page.evaluate(() => { window.__perf.on = false; });
+  if (process.argv.includes('--trace')) {
+    const ev = JSON.parse((await browser.stopTracing()).toString()).traceEvents.filter(e => e.ph === 'X' && e.dur), sum = {};
+    for (const e of ev) if (['UpdateLayoutTree', 'Layout', 'Paint', 'PrePaint', 'Layerize', 'Commit', 'FunctionCall', 'FireAnimationFrame', 'TimerFire', 'EventDispatch', 'Decode Image', 'ImageDecodeTask', 'MajorGC', 'MinorGC', 'HitTest', 'RasterTask', 'CompositeLayers', 'UpdateLayerTree', 'RunTask', 'Animate'].includes(e.name)) sum[e.name] = (sum[e.name] || 0) + e.dur / 1000;
+    // 40ms 넘는 메인 스레드 작업마다 안에서 무슨 일을 했나(큰 것 4개): 긴 프레임의 원인
+    const main = ev.filter(e => e.name === 'RunTask' && e.dur > 40000), t00 = Math.min(...ev.map(e => e.ts));
+    for (const t of main.slice(0, 40)) { const kids = {}; for (const e of ev) if (e.tid === t.tid && e.pid === t.pid && e.ts >= t.ts && e.ts + e.dur <= t.ts + t.dur && e !== t && e.name !== 'RunTask') kids[e.name] = Math.max(kids[e.name] || 0, e.dur / 1000); console.error(`long ${((t.ts - t00) / 1e6).toFixed(1)}s ${Math.round(t.dur / 1000)}ms: ` + Object.entries(kids).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => `${k} ${Math.round(v)}`).join(' · ')); }
+    console.error('trace(ms): ' + Object.entries(sum).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${Math.round(v)}`).join(' · '));
+  }
 }
 const t0 = Date.now(), shots = [[9000, 'runner-play-run.jpg']];
 let cards = 0, shotRescue = false, shotSiege = false, burstAt = 0, burstN = 0; const shotSeen = {};
