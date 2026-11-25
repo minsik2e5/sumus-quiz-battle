@@ -17,7 +17,8 @@ import { schoolClasses, schoolGrades, gradeTargets } from '../public/modules/sch
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 const COUNTS = { 21: 39, 22: 29, 23: 34, 24: 43, 29: 30, 30: 36, 32: 38, 33: 47, 34: 39, 35: 42, 36: 39, 37: 44, 38: 38, 39: 30, 40: 44 };
 // 단원고2를 넣기 전(V13.246.0) 학생 화면 책 · 범위 · 단어 수. 바뀌면 안 된다.
-const BEFORE = [['danwon-high', '고1A', 6, 27, 1273], ['danwon-high', '고1B', 6, 27, 1273], ['seonbu-high', '고1A', 5, 28, 1059], ['gangseo-high', '고1B', 6, 26, 1131], ['wonil-middle', '중2', 3, 3, 194], ['wonil-middle', '중3', 3, 3, 212]];
+// V13.248: 원일중 중2에는 8과 기말 책(52단어)이 더해져 4권 · 4범위 · 246단어(5 · 6 · 7과 194 + 8과 52).
+const BEFORE = [['danwon-high', '고1A', 6, 27, 1273], ['danwon-high', '고1B', 6, 27, 1273], ['seonbu-high', '고1A', 5, 28, 1059], ['gangseo-high', '고1B', 6, 26, 1131], ['wonil-middle', '중2', 4, 4, 246], ['wonil-middle', '중3', 3, 3, 212]];
 
 export async function runDanwon2Checks(assert, expectStatus) {
   /* ---------- 책 ---------- */
