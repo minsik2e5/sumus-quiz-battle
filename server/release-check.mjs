@@ -104,6 +104,7 @@ import { runSchoolLeagueChecks } from './school-league-check.mjs';
 import { runStabilityChecks } from './stability-check.mjs';
 import { runStorageTrimChecks } from './storage-trim-check.mjs';
 import { runSignupCodeChecks } from './signup-code-check.mjs';
+import { runDanwon2Checks } from './danwon2-check.mjs';
 import { runRewardEventChecks } from './reward-event-check.mjs';
 import { runDungeonRewardChecks } from './dungeon-reward-check.mjs';
 import { compactSession, migrateState, stateSizeReport } from './state.mjs';
@@ -177,7 +178,8 @@ export async function runReleaseCheck() {
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
     const bySchool = school => runtimeBooks.filter(book => book.school === school).flatMap(book => book.words || []);
-    assert(bySchool('단원고').length === 542 + 268 + 463, '단원고 vocabulary = 1273 (existing 362 + YBM Kim READING DB 68 + 112 + 기말고사 3과 본문 114 + 4과 본문 154 + 9월 모의고사 463)');
+    // V13.247 단원고2(별도 학교)의 572단어는 단원고에 들어가지 않는다: 단원고 단어 수는 1273 그대로.
+    assert(bySchool('단원고').length === 542 + 268 + 463 && bySchool('단원고2').length === 572, '단원고 vocabulary = 1273 (existing 362 + YBM Kim READING DB 68 + 112 + 기말고사 3과 본문 114 + 4과 본문 154 + 9월 모의고사 463)');
     {
       const ybm = bySchool('단원고').filter(word => word.id.startsWith('high:ybm-kim:common2:'));
       const byId = id => ybm.find(word => word.id === id);
@@ -1661,6 +1663,7 @@ await runPlaygroundMenuChecks(assert);
     await runStabilityChecks(assert);
     await runStorageTrimChecks(assert, expectStatus);
     await runSignupCodeChecks(assert, expectStatus);
+    await runDanwon2Checks(assert, expectStatus);
     await runRewardEventChecks(assert, expectStatus);
     await runDungeonRewardChecks(assert, expectStatus);
     await runGamesChecks(assert);

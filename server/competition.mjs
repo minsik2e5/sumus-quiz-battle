@@ -47,10 +47,10 @@ export const sameGradeBand = (a, b) => {
   const grade = gradeOf(a?.class_name);
   return !!a?.division && a.division === b?.division && /^(중|고)[1-3]$/.test(grade) && grade === gradeOf(b?.class_name);
 };
-// The grade group of the ranking tab.
+// The grade group of the ranking tab. V13.247 단원고 고2 반은 '고2'(고1과 따로).
 export function rankGrade(profile) {
   const c = profile?.class_name || '';
-  return /^중2/.test(c) ? '중2' : /^중3/.test(c) ? '중3' : /^고1/.test(c) ? '고1' : (profile?.division === 'middle' ? '중등' : '고등');
+  return /^중2/.test(c) ? '중2' : /^중3/.test(c) ? '중3' : /^고1/.test(c) ? '고1' : /^고2/.test(c) ? '고2' : (profile?.division === 'middle' ? '중등' : '고등');
 }
 const push = (map, key, value) => { if (!map.has(key)) map.set(key, []); map.get(key).push(value); };
 // KST calendar day and Monday-based week as plain numbers (KST has no daylight saving), so

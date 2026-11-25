@@ -1,6 +1,7 @@
 import { api, modal, $, $$, esc, date, toast, buttonBusy, icon } from './modules/ui.js';
 import { avatar } from './modules/character.js';
 import { CLASS_OPTIONS } from './modules/core.js';
+import { schoolClasses } from './modules/school-classes.js';
 import { loadStudentActivity } from './modules/teacher-activity.js';
 import { teacherStudentDetail, forgetStudentDetail } from './modules/teacher-records.js';
 
@@ -95,7 +96,8 @@ async function openStudentDetail(id) {
   const grammarRecent = [...grammarItems].sort((a, b) => Number(b.updated_at || 0) - Number(a.updated_at || 0))[0];
   const recent = shortActivity(lastActivity(data, id, detail));
   const schoolOptions = data.schools.map(s => `<option value="${esc(s.id)}" ${(s.id === p.school_id || (!p.school_id && s.name === p.school)) ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
-  const divisionClasses = data.profile.active_division === 'middle' ? ['중2','중3'] : ['고1A','고1B'];
+  // V13.247 반 목록은 학생 학교마다(단원고2는 고2).
+  const divisionClasses = schoolClasses({ id: p.school_id || data.profile.active_school_id, division: data.profile.active_division });
   const classOptions = [...new Set([...divisionClasses, p.class_name].filter(Boolean))].map(c => `<option value="${esc(c)}" ${c === p.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
   const close = modal(`
     <div class="sumus-student-hero">
@@ -131,6 +133,12 @@ async function openStudentDetail(id) {
 `, '학생 관리');
 
   loadStudentActivity(id, $('#student-activity-box'));
+  // V13.247 학교를 바꾸면 반 목록도 그 학교 것으로(단원고2는 고2).
+  const enhForm = $('#student-enhanced-update');
+  enhForm.elements.school_id?.addEventListener('change', event => {
+    const classes = schoolClasses({ id: event.target.value, division: data.profile.active_division }), sel = enhForm.elements.class_name, keep = classes.includes(sel.value) ? sel.value : classes[0];
+    sel.innerHTML = classes.map(c => `<option value="${esc(c)}" ${c === keep ? 'selected' : ''}>${esc(c)}</option>`).join('');
+  });
   $('#student-enhanced-update').onsubmit = async event => {
     event.preventDefault();
     const form = event.currentTarget;

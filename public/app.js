@@ -1,5 +1,6 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date, num, rangeLabel } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm, GIFT_PET_KEYS, GIFT_PET_GROUPS, giftPetGroup, giftPetTier } from './modules/core.js';
+import { schoolClasses, gradeTargets } from './modules/school-classes.js';
 import { avatar, showPose } from './modules/character.js';
 import { studentPage, getRanges, periodFolders, activePeriod, inPeriod, updateRangeSummary, starredWords, pushSupport, memorizeDeck, highExamSelection, HIGH_PICK_STORES, HIGH_EXAM_MAX, toggleHighChunk } from './modules/student.js';
 import { openFlashcards } from './modules/flashcards.js';
@@ -44,7 +45,9 @@ const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
 const examTargetMatches = (exam, profile) => exam?.class_name === ALL_CLASSES || exam?.class_name === profile?.class_name;
 const examRangeGrade = value => value === ALL_CLASSES ? null : value;
-const examTargetOptions = () => A.data.profile.active_division === 'middle' ? ['중2', '중3'] : [ALL_CLASSES, '고1A', '고1B'];
+// V13.247 반 목록은 선생님이 고른 학교마다(단원고2는 고2 한 반, modules/school-classes.js).
+const activeSchoolRef = () => ({ id: A.data.profile.active_school_id, division: A.data.profile.active_division });
+const examTargetOptions = () => A.data.profile.active_division === 'middle' ? schoolClasses(activeSchoolRef()) : [ALL_CLASSES, ...schoolClasses(activeSchoolRef())];
 let poll, rendering = false, contextGeneration = 0;
 function preferences() {
   try {
@@ -1456,7 +1459,7 @@ function vocabImportModal() {
     } catch (err) { $('#vocab-import-error').textContent = err.message; buttonBusy(event.currentTarget, false); }
   });
 }
-function activeClassOptions() { return (A.data.profile.active_division === 'middle' ? ['중2','중3'] : ['고1A','고1B']); }
+function activeClassOptions() { return schoolClasses(activeSchoolRef()); }
 function addStudent() {
   const classOptions = activeClassOptions().map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
   const close = modal(`<h2>학생 등록</h2><p>${esc(A.school)} 학생 계정을 만듭니다. 아이디와 비밀번호를 학생에게 알려주세요.</p><form id="student-form"><input type="hidden" name="school_id" value="${esc(A.data.profile.active_school_id)}"><div class="form-columns"><label class="field"><span>학생 이름</span><input name="display_name" required maxlength="40"></label><label class="field"><span>반</span><select name="class_name" required>${classOptions}</select></label></div><div class="locked-school">${icon('shield')}<div><b>${esc(A.school)}</b><small>현재 관리 중인 학교</small></div></div><label class="field"><span>아이디</span><input name="username" required pattern="[a-z0-9_.-]{3,40}" placeholder="영문·숫자 3자 이상" autocomplete="off"></label><label class="field"><span>비밀번호</span><input name="password" required minlength="8" maxlength="128" type="password" placeholder="8자 이상" autocomplete="new-password"></label><div id="student-error" class="form-error" role="alert"></div><button class="btn primary full" type="submit">학생 등록하기</button></form>`, '학생 등록');
@@ -1472,8 +1475,14 @@ async function studentModal(id) {
   const grammarRecent = [...grammarItems].sort((a, b) => Number(b.updated_at || 0) - Number(a.updated_at || 0))[0];
   const wordMastery = detail?.word_mastery || A.data.word_mastery?.[id] || {};
   const schoolOptions = A.data.schools.map(s => `<option value="${esc(s.id)}" ${s.id === p.school_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
-  const classOptions = [...new Set([...activeClassOptions(), p.class_name].filter(Boolean))].map(c => `<option value="${esc(c)}" ${c === p.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
+  const classOptions = [...new Set([...schoolClasses({ id: p.school_id || A.data.profile.active_school_id, division: A.data.profile.active_division }), p.class_name].filter(Boolean))].map(c => `<option value="${esc(c)}" ${c === p.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
   const close = modal(`<h2>${esc(p.display_name)}</h2><p>${esc(p.class_name)} · ${p.school} · ${esc(p.username)}</p><div class="detail-grid"><div><b>${p.stats.today_total}문제</b><small>오늘 학습량</small></div><div><b>${p.stats.accuracy}%</b><small>연습 정답률</small></div><div><b>${p.stats.weak}개</b><small>취약 단어</small></div><div><b>${attempts.length}회</b><small>실전시험 응시</small></div></div><div class="sumus-detail-section"><h3>시험범위 정복</h3><div class="detail-grid"><div><b>${wordMastery.mastered || 0}/${wordMastery.total_ranges || 0}</b><small>단어 MASTER</small></div><div><b>${wordMastery.conquest || 0}%</b><small>단어 정복도</small></div><div><b>${grammarMastered}</b><small>어법 MASTER</small></div><div><b>${grammarItems.length}</b><small>어법 학습 지문</small></div></div><p class="sumus-account-note">${grammarRecent ? `최근 어법 학습 ${date(grammarRecent.updated_at)}` : '어법·어휘 학습 기록 없음'}</p></div><form id="student-update"><label class="field"><span>이름</span><input name="display_name" value="${esc(p.display_name)}" required maxlength="40"></label><label class="field"><span>학교 변경</span><select name="school_id">${schoolOptions}</select></label><label class="field"><span>반 변경</span><select name="class_name" required>${classOptions}</select></label><label class="field"><span>새 비밀번호 (변경할 때만)</span><input name="password" type="password" minlength="8" autocomplete="new-password" placeholder="8자 이상"></label><label class="checkbox-line"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}>계정 활성화</label><div class="form-error" id="update-error" role="alert"></div><button class="btn primary full" type="submit">변경 저장</button><div class="sumus-account-actions"><button class="btn" type="button" id="student-quick-reset">비밀번호 12345678로 재설정</button><button class="btn sumus-danger" type="button" id="student-quick-delete">학생 계정 삭제</button></div></form>`, '학생 정보');
+  // V13.247 학교를 바꾸면 반 목록도 그 학교 것으로(단원고2는 고2).
+  const updForm = $('#student-update');
+  updForm.elements.school_id?.addEventListener('change', event => {
+    const classes = schoolClasses({ id: event.target.value, division: A.data.profile.active_division }), sel = updForm.elements.class_name, keep = classes.includes(sel.value) ? sel.value : classes[0];
+    sel.innerHTML = classes.map(c => `<option value="${esc(c)}" ${c === keep ? 'selected' : ''}>${esc(c)}</option>`).join('');
+  });
   $('#student-update').onsubmit = async e => { e.preventDefault(); const v = Object.fromEntries(new FormData(e.currentTarget)); try { await api('/students/' + id, { ...v, active: v.active === 'on' }, 'PATCH'); close(); await refresh(); render(); toast('학생 정보를 저장했어요.'); } catch (err) { $('#update-error').textContent = err.message; } };
   $('#student-quick-reset').onclick = async e => { if (!confirm(p.display_name + ' 학생의 비밀번호를 12345678로 재설정할까요?')) return; buttonBusy(e.currentTarget); try { await api('/students/' + id, { password: '12345678' }, 'PATCH'); toast('비밀번호를 12345678로 재설정했어요.'); } catch (err) { toast(err.message); } finally { buttonBusy(e.currentTarget, false); } };
   $('#student-quick-delete').onclick = async e => { if (!confirm(p.display_name + ' 학생 계정을 삭제할까요?\n연습 기록과 시험 기록도 함께 삭제됩니다.')) return; buttonBusy(e.currentTarget); try { await api('/students/' + id, {}, 'DELETE'); close(); await refresh(); render(); toast('학생 계정을 삭제했어요.'); } catch (err) { toast(err.message); buttonBusy(e.currentTarget, false); } };
@@ -1723,10 +1732,12 @@ function openTournamentTv(id) {
   openBracketTv(A, id, async () => { A.screen = null; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); });
 }
 // V13.66 teacher: open an academy tournament for one grade (or class).
+// V13.247 대상: 중2 · 중3, 고1 전체 · 고1A · 고1B, 단원고2는 고2(school-classes.js gradeTargets).
+const tournamentTargets = school => gradeTargets(school);
 const gradeOfClass = value => String(value || '').match(/^(중[1-3]|고[1-3])/)?.[1] || String(value || '');
 function tournamentCreateModal() {
   const middle = A.data.profile.active_division === 'middle';
-  const targets = middle ? [['중2', '중2'], ['중3', '중3']] : [['고1', '고1 전체'], ['고1A', '고1A'], ['고1B', '고1B']];
+  const targets = tournamentTargets(activeSchoolRef());
   const students = target => A.data.profiles.filter(p => p.active && !p.preview_owner_id && (target === gradeOfClass(target) && target.length === 2 ? gradeOfClass(p.class_name) === target : p.class_name === target)).sort((a, b) => a.display_name.localeCompare(b.display_name, 'ko'));
   const roundName = n => { let size = 2; while (size < n) size *= 2; return size === 2 ? '결승' : `${size}강`; };
   const MAX_PLAYERS = 32;

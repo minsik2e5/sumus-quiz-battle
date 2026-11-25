@@ -4,9 +4,10 @@ import { seonbuExternalFinalBook } from './seonbu-external-final.mjs';
 import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { gangseoSepMockBook } from './gangseo-sep-mock.mjs';
 import { danwonSepMockBook } from './danwon-sep-mock.mjs';
+import { danwon2SepMockBook } from './danwon2-sep-mock.mjs';
 
 export function runMockBookCleanChecks(assert) {
-  const books = [seonbuExternalFinalBook, seonbu44Correction, gangseoSepMockBook, danwonSepMockBook];
+  const books = [seonbuExternalFinalBook, seonbu44Correction, gangseoSepMockBook, danwonSepMockBook, danwon2SepMockBook];
   for (const book of books) {
     for (const w of book.words) {
       const word = String(w.word), meaning = String(w.meaning);

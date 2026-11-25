@@ -208,7 +208,7 @@ export async function runTitles4Checks(assert) {
     assert(/repairStreak\(state, student, endedAt\);\n[^\n]*\n\s*if \(student\?\.role === 'student' && answerRecords\.length\) rememberRangeBest\(student, studentRangeCounts\(state, student\)\);/.test(svc) && svc.includes('setRangeCounter(studentRangeCounts);'),
       'V13.191 최고값은 연습이 끝날 때(finishPractice) 서버가 채점한 단어 기록으로만 센다');
     const mocks = allBooks({ extraBooks: [] }).filter(b => b.mock).map(b => b.id).sort();
-    assert(mocks.join() === 'danwon:final:mock-sep-2026,gangseo:final:mock-sep-2026,seonbu-external-44-corrected-202603,seonbu:final:external-45-60-2026', 'V13.191 모의고사 책 표시(mock: true)는 단원고 9월(V13.237) · 강서고 9월 · 선부고 외부지문 44 · 45~60 넷');
+    assert(mocks.join() === 'danwon2:final:mock-sep-2026,danwon:final:mock-sep-2026,gangseo:final:mock-sep-2026,seonbu-external-44-corrected-202603,seonbu:final:external-45-60-2026', 'V13.191 모의고사 책 표시(mock: true)는 단원고 9월(V13.237) · 단원고2 9월(V13.247) · 강서고 9월 · 선부고 외부지문 44 · 45~60 다섯');
   }
 
   // ---- 보이는 범위: 모의고사 칭호는 모의고사 책이 있는 학교만, 심해 칭호는 심해 그림이 다 있을 때만
