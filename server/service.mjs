@@ -1341,6 +1341,16 @@ export async function service(state, method, path, body, token, options = {}) {
     const studentProfiles = state.profiles.filter(x => x.role === 'student' && x.division === selectedDivision && (!teacher || (sameSchool(x, selectedSchool) && !x.preview_owner_id)));
     const studentIds = new Set(studentProfiles.map(s => s.id));
     const sessions = state.sessions.filter(s => s.division === selectedDivision && sameSchool(s, selectedSchool) && (teacher ? studentIds.has(s.student_id) : s.student_id === p.id)).sort((a, b) => b.created_at - a.created_at);
+    // V13.247 학교를 옮긴 학생(예: 단원고 → 단원고2): 코인 · 경험치 · 레벨 · 연속 학습은 사람마다라 전 학교 연습도 센다
+    // (서버가 코인을 쓸 때 세는 것과 같게). 연습 기록 목록 · 결과 분석은 범위 이름이 학교마다라 지금 학교 것만(위 sessions).
+    // 학교를 옮긴 적 없는 학생은 다른 학교 기록이 없어 전과 같다.
+    const carried = new Map();
+    for (const s of state.sessions) {
+      if (s.division !== selectedDivision || !s.school_id || sameSchool(s, selectedSchool) || !(teacher ? studentIds.has(s.student_id) : s.student_id === p.id)) continue;
+      if (!carried.has(s.student_id)) carried.set(s.student_id, []);
+      carried.get(s.student_id).push(s);
+    }
+    const statSessions = (id, own) => carried.has(id) ? [...own, ...carried.get(id)].sort((a, b) => b.created_at - a.created_at) : own;
     const sessionsByStudent = new Map();
     if (teacher) for (const session of sessions) {
       if (!sessionsByStudent.has(session.student_id)) sessionsByStudent.set(session.student_id, []);
@@ -1378,10 +1388,10 @@ export async function service(state, method, path, body, token, options = {}) {
       assignment_id: activePractice.assignment_id || null,
       daily_quest: !!activePractice.daily_quest
     } : null;
-    return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, arena_invite: p.role === 'student' ? arenaInviteFor(state, p, schoolForProfile(state, p), Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
+    return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, statSessions(p.id, sessions)), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, arena_invite: p.role === 'student' ? arenaInviteFor(state, p, schoolForProfile(state, p), Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
       // V13.215 선생님: 학생 목록은 화면이 쓰는 칸만, 연습 기록은 오늘 것 + 최근 실전시험 6개만(server/teacher-home.mjs).
       // 학생별 이번 주 · 지난주 · 마지막 학습은 session_digest, 전체 기록은 결과 분석 탭의 GET /teacher/records.
-      profiles: teacher ? studentProfiles.map(s => ({ ...teacherStudentRow(s, stats(state, s, sessionsByStudent.get(s.id) || [], battlesByStudent)), active_at: lastActiveAt(s) })) : [],
+      profiles: teacher ? studentProfiles.map(s => ({ ...teacherStudentRow(s, stats(state, s, statSessions(s.id, sessionsByStudent.get(s.id) || []), battlesByStudent)), active_at: lastActiveAt(s) })) : [],
       sessions: teacher ? homeSessions(sessions, dayKey, now).map(sessionSummary) : sessions.map(hydrateSession), exams: visibleExams,
       session_digest: teacher ? sessionDigest(sessions, now) : null,
       sessions_scope: teacher ? 'home' : 'all',

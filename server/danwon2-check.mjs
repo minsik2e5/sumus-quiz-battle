@@ -71,7 +71,7 @@ export async function runDanwon2Checks(assert, expectStatus) {
   const student = (id, schoolId, cls) => ({ id, username: id, display_name: id, role: 'student', active: true, class_name: cls, school_id: schoolId, school: SCHOOLS[schoolId], division: schoolId.endsWith('middle') ? 'middle' : 'high', password_hash: hash, created_at: Date.now() - 86400000, pets: [{ key: 'dog', first: true, acquired_at: 1 }], avatar_key: 'dog' });
   state.profiles.push(
     { id: 'qa-d2-teacher', username: 'qa_d2_teacher', display_name: '단원고2 선생님', role: 'teacher', active: true, password_hash: hash, school_ids: [], division_ids: ['middle', 'high'], active_division: 'high', active_school_id: 'danwon-high' },
-    student('qa-d2-a', 'danwon-high-2', '고2'), student('qa-d2-b', 'danwon-high-2', '고2'), student('qa-d2-1a', 'danwon-high', '고1A'), student('qa-d2-1b', 'danwon-high', '고1B'),
+    student('qa-d2-a', 'danwon-high-2', '고2'), student('qa-d2-b', 'danwon-high-2', '고2'), student('qa-d2-1a', 'danwon-high', '고1A'), student('qa-d2-1b', 'danwon-high', '고1B'), { ...student('qa-d2-mv', 'danwon-high', '고1A'), pets: [{ key: 'dog', first: true, acquired_at: 1 }, { key: 'cat', acquired_at: 2 }], avatar_key: 'cat' },
     student('qa-d2-sb', 'seonbu-high', '고1A'), student('qa-d2-gs', 'gangseo-high', '고1B'), student('qa-d2-m2', 'wonil-middle', '중2'), student('qa-d2-m3', 'wonil-middle', '중3')
   );
   for (const p of state.profiles.filter(x => x.role === 'student')) state.sessions.push({ id: 'qa-d2-coins-' + p.id, student_id: p.id, division: p.division, school_id: p.school_id, school: p.school, total: 1, correct: 1, xp: 0, reward_points: 1000, created_at: Date.now() - 3600000, range_codes: [] });
@@ -80,6 +80,7 @@ export async function runDanwon2Checks(assert, expectStatus) {
   for (const p of state.profiles.filter(x => x.id.startsWith('qa-d2-'))) t[p.id] = (await service(state, 'POST', '/login', { username: p.username, password: 'QaD2pass1!', division: p.division || 'high', role: p.role === 'teacher' ? 'teacher' : undefined }, null))._cookie;
   const boot = id => service(state, 'GET', '/bootstrap', {}, t[id]);
   const tt = t['qa-d2-teacher'];
+  const now0 = Date.now();
 
   /* ---------- 선생님이 단원고2를 고른다 ---------- */
   const teacherHigh = await boot('qa-d2-teacher');
@@ -113,6 +114,25 @@ export async function runDanwon2Checks(assert, expectStatus) {
   const moved = await service(state, 'PATCH', '/students/qa-d2-1b', { school_id: 'danwon-high-2', class_name: '고2' }, tt);
   assert(moved.school_id === 'danwon-high-2' && moved.school === '단원고2' && moved.class_name === '고2', 'V13.247 선생님이 단원고에 가입한 학생을 단원고2 · 고2로 옮긴다(선생님만, 자동으로 옮기지 않는다)');
   await expectStatus(400, () => service(state, 'PATCH', '/students/qa-d2-1a', { school_id: 'danwon-high-2' }, tt), 'V13.247 반을 고2로 같이 바꾸지 않으면 단원고2로 옮길 수 없다');
+  // 선생님 요청 "○○ 친구 고2로 옮겨줘": 단원고 고1A 학생 → 단원고2 고2(학생 정보 수정, PATCH /students/:id). 펫 · 코인 · 기록은 그대로.
+  const mvWord = scopedWords(state, 'danwon-high', ['9월 21'], '고1A')[0];
+  state.mastery['qa-d2-mv'] = { [mvWord.id]: { correct: 3, wrong: 1, recent_results: [{ correct: true, at: now0 }] } };
+  const mvBefore = await boot('qa-d2-mv');
+  const keep = b => JSON.stringify({ pets: b.profile.pets, avatar: b.profile.avatar_key, coins: b.stats.points_balance, xp: b.stats.xp, level: b.stats.level, practices: b.stats.practice_count });
+  const mvSessions = JSON.stringify(state.sessions.filter(x => x.student_id === 'qa-d2-mv'));
+  assert(mvBefore.books.some(b => b.id === 'danwon:final:mock-sep-2026') && !mvBefore.books.some(b => b.id === book.id) && mvBefore.stats.points_balance > 0, 'V13.247 옮기기 전: 단원고 고1A 학생은 단원고 책을 보고 코인이 있다');
+  const mv = await service(state, 'PATCH', '/students/qa-d2-mv', { school_id: 'danwon-high-2', class_name: '고2' }, tt);
+  await expectStatus(401, () => boot('qa-d2-mv'), 'V13.247 학교를 옮기면 그 학생은 로그아웃된다(다시 로그인하면 새 학교 화면)');
+  t['qa-d2-mv'] = (await service(state, 'POST', '/login', { username: 'qa-d2-mv', password: 'QaD2pass1!', division: 'high' }, null))._cookie;
+  const mvAfter = await boot('qa-d2-mv');
+  assert(mv.school_id === 'danwon-high-2' && mv.class_name === '고2' && mvAfter.profile.school === '단원고2' && mvAfter.profile.class_name === '고2', 'V13.247 단원고 고1A 학생을 단원고2 · 고2로 옮긴다');
+  assert(mvAfter.books.length === 1 && mvAfter.books[0].id === book.id && mvAfter.books[0].words.length === 572 && !mvAfter.books.some(b => b.school_id === 'danwon-high'), 'V13.247 옮긴 학생은 단원고2 책 572단어만 보고 단원고 책은 안 본다');
+  assert(keep(mvAfter) === keep(mvBefore) && JSON.stringify(state.sessions.filter(x => x.student_id === 'qa-d2-mv')) === mvSessions && state.mastery['qa-d2-mv'][mvWord.id]?.correct === 3,
+    'V13.247 옮겨도 펫 · 대표 펫 · 코인 · 경험치 · 레벨 · 연습 기록 · 단어 기록은 그대로');
+  state.profiles.find(p => p.id === 'qa-d2-teacher').active_school_id = 'danwon-high-2';
+  const mvRow = (await boot('qa-d2-teacher')).profiles.find(x => x.id === 'qa-d2-mv');
+  assert(mvRow?.class_name === '고2' && mvRow.stats.practice_count === mvBefore.stats.practice_count && mvRow.stats.points_balance === mvBefore.stats.points_balance, 'V13.247 선생님 단원고2 학생 관리에도 옮긴 학생의 연습 수 · 코인이 그대로 보인다');
+  state.profiles.find(p => p.id === 'qa-d2-teacher').active_school_id = 'danwon-high';
   state.profiles.find(p => p.id === 'qa-d2-teacher').active_school_id = 'danwon-high-2';
   await service(state, 'POST', '/teacher/student-preview', { school_id: 'danwon-high-2', grade: '고2' }, tt);
   assert(state.profiles.find(p => p.id === 'teacher-preview:qa-d2-teacher:danwon-high-2:고2')?.class_name === '고2', 'V13.247 선생님 미리보기에서 단원고2 고2 학생 화면을 본다');
