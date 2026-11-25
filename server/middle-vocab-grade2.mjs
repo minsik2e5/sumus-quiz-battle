@@ -232,3 +232,77 @@ const lesson7 = [
 ];
 
 export const middleGrade2Books = [makeBook(5, lesson5), makeBook(6, lesson6), makeBook(7, lesson7)];
+
+// V13.248 8과(2026-11-25): 선생님이 보낸 교과서 「교과서 어휘 목록」 한 쪽 사진 — 대화문(CONVERSATION) 18 + 본문(READING) 34 = 52.
+// 사진에 과 번호는 없지만 5·6·7과와 겹치는 단어가 거의 없고(do one's best만 5과에도 있음, 과마다 그대로 둔다) 다음 과라 8과로 넣었다.
+// 2학기 기말고사 대비라 이 과만 기말고사(exam_period: 'final', id에 `:final:`)로 묶는다. 5·6·7과 id·묶음은 그대로 둔다.
+// 7과처럼 대화문 단어도 넣는다(중2는 5·6·7과 모두 대화문 + 본문). 활용형 괄호(shoot-shot-shot 등)는 뜻에 넣지 않는다.
+export const MIDDLE_GRADE2_FINAL_PERIOD = 'final';
+const makeFinalBook = (lesson, entries) => {
+  const base = makeBook(lesson, entries);
+  const bookId = `middle:ybm-park:grade2:final:lesson${lesson}`;
+  const period = { exam_period: MIDDLE_GRADE2_FINAL_PERIOD };
+  return {
+    ...base, id: bookId, ...period, title: `중2 YBM(박준언) ${lesson}과 (기말고사)`,
+    words: base.words.map(word => ({ ...word, id: word.id.replace(base.id, bookId), book_id: bookId, ...period }))
+  };
+};
+
+const lesson8 = [
+  // CONVERSATION (대화문) 18
+  ['print', '~을 출력하다', ['출력하다']],
+  ['scissors', '가위'],
+  ['shoot', '~을 쏘다', ['쏘다']],
+  ['laser', '레이저'],
+  ['straight line', '직선'],
+  ['useful', '유용한'],
+  ['maybe', '아마도', ['아마']],
+  ['charge', '~을 충전하다', ['충전하다']],
+  ['heat', '~을 데우다, 가열하다', ['데우다', '가열하다']],
+  ['strange', '이상한, 낯선', ['이상한', '낯선']],
+  ['cube', '정육면체, 큐브', ['정육면체', '큐브']],
+  ['projector', '프로젝터, 영상 투사 장치', ['프로젝터', '영상 투사 장치']],
+  ['anywhere', '어디에서든', ['어디서든']],
+  ['magic', '마법의'],
+  ['work', '작동하다'],
+  ['object', '물체, 물건', ['물체', '물건']],
+  ['exact', '정확한'],
+  ['mix', '~을 섞다', ['섞다']],
+  // READING (본문) 34
+  ['difference', '차이'],
+  ['take part in ~', '~에 참가하다', ['참가하다']],
+  ['competition', '경기, 대회', ['경기', '대회']],
+  ['touch', '~에 닿다, 접촉하다', ['닿다', '접촉하다']],
+  ['bar', '바, 가로대', ['바', '가로대']],
+  ['fall', '떨어지다'],
+  ['ground', '땅, 지면', ['땅', '지면']],
+  ['lose', '(경기 등에서) 지다, 패배하다', ['지다', '패배하다']],
+  ['final', '결승전'],
+  ['fly', '날다, 날아오르다', ['날다', '날아오르다']],
+  ['clear', '~을 넘다, ~에 닿지 않고 통과하다', ['넘다', '닿지 않고 통과하다']],
+  ['laugh at ~', '~을 비웃다', ['비웃다']],
+  ['back', '(신체의) 등', ['등']],
+  ['record', '(성적·결과 등의) 기록', ['기록']],
+  ['creation', '창조'],
+  ['national', '전국적인'],
+  ['improve', '개선되다, 향상되다', ['개선되다', '향상되다']],
+  ['although', '비록 ~이지만, ~에도 불구하고', ['비록 ~이지만', '~에도 불구하고', '이지만', '에도 불구하고']],
+  ["do one's best", '최선을 다하다'],
+  ['give up', '포기하다'],
+  ['forward', '앞으로, 앞쪽으로', ['앞으로', '앞쪽으로']],
+  ['toe', '발가락'],
+  ['stomach', '배'],
+  ['chest', '가슴, 흉부', ['가슴', '흉부']],
+  ['thought', '사고, 심사숙고', ['사고', '심사숙고']],
+  ['come up with ~', '(아이디어·계획 등)을 생각해 내다', ['생각해 내다', '생각해내다']],
+  ['backward', '뒤로, 뒤쪽으로', ['뒤로', '뒤쪽으로']],
+  ['hero', '영웅'],
+  ['idea', '생각'],
+  ['name A B after C', 'C의 이름을 따서 A를 B라고 이름 짓다'],
+  ['flop', '(높이뛰기에서) 등을 젖혀 뛰는 방식', ['등을 젖혀 뛰는 방식']],
+  ['other', '다른'],
+  ['once', '한때'],
+  ['popular', '인기 있는, 대중적인', ['인기 있는', '대중적인']]
+];
+
+export const middleGrade2FinalBooks = [makeFinalBook(8, lesson8)];
