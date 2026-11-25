@@ -3,7 +3,9 @@ import { passwordHash } from './auth.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const str = (value, max = 120) => typeof value === 'string' ? value.trim().slice(0, max) : '';
-export const CLASS_BY_DIVISION = { middle: ['중2', '중3'], high: ['고1A', '고1B'] };
+import { DIVISION_CLASSES, schoolClasses as classesOfSchool } from '../public/modules/school-classes.js';
+// V13.247 부마다 기본 반(+ 학교마다 더하는 반: 단원고 고2, public/modules/school-classes.js).
+export const CLASS_BY_DIVISION = DIVISION_CLASSES;
 
 // V13.141 반별 가입 코드. 학생은 코드를 넣어야만 가입할 수 있고, 코드가 학교·반을 정한다.
 // 코드는 state.signupCodes에만 있고 서버에서만 비교한다(학생·가입 화면 응답에는 나가지 않는다).
@@ -14,7 +16,7 @@ export const SIGNUP_CODE_MESSAGE = '가입 코드를 확인해 주세요.';
 export const SIGNUP_CODE_FAIL_MAX = 20;
 export const SIGNUP_CODE_FAIL_WINDOW_MS = 30 * 60000;
 export const normalizeSignupCode = value => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
-const schoolClasses = school => CLASS_BY_DIVISION[school?.division] || [];
+const schoolClasses = school => school ? classesOfSchool(school) : [];
 
 export function newSignupCode(state) {
   const used = new Set((state.signupCodes || []).map(item => item.code));

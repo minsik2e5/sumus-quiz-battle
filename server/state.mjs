@@ -3,6 +3,8 @@ import { seedSignupCodes } from './signup.mjs';
 export const DEFAULT_SCHOOLS = [
   { id: 'wonil-middle', name: '원일중', full_name: '원일중학교', division: 'middle', active: true, sort_order: 5 },
   { id: 'danwon-high', name: '단원고', full_name: '단원고등학교', division: 'high', active: true, sort_order: 10 },
+  // V13.247 단원고 2학년은 따로 관리하는 학교(반은 고2 한 반, public/modules/school-classes.js).
+  { id: 'danwon-high-2', name: '단원고2', full_name: '단원고등학교 2학년', division: 'high', active: true, sort_order: 11 },
   { id: 'seonbu-high', name: '선부고', full_name: '선부고등학교', division: 'high', active: true, sort_order: 20 },
   { id: 'gangseo-high', name: '강서고', full_name: '강서고등학교', division: 'high', active: true, sort_order: 30 }
 ];

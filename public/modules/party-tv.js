@@ -2,6 +2,7 @@ import { api, esc, num, icon, toast, modal, buttonBusy, rangeLabel, $, $$ } from
 import { avatar } from './character.js';
 import { coin } from './emblems.js';
 import { getRanges, periodFolders } from './student.js';
+import { gradeTargets } from './school-classes.js';
 import { playSound, unlockSound, preloadSound } from './sound.js';
 import { FISH, RARITY, kgText } from './fishing-rules.js';
 import { fishPic } from './fishing-art.js';
@@ -25,7 +26,8 @@ export async function partyCreateModal(A, onOpen) {
   let open = null;
   try { open = (await api('/teacher/party')).party; } catch {}
   const middle = A.data.profile.active_division === 'middle';
-  const targets = middle ? [['중2', '중2'], ['중3', '중3']] : [['고1', '고1 전체'], ['고1A', '고1A'], ['고1B', '고1B']];
+  // V13.247 대상: 중2 · 중3, 고1 전체 · 고1A · 고1B, 단원고2는 고2(school-classes.js gradeTargets).
+  const targets = gradeTargets({ id: A.data.profile.active_school_id, division: A.data.profile.active_division });
   const close = modal(`<form id="pg-form" class="pg-form">
     <h2>🎮 교실 게임 열기</h2>
     <p class="tiny muted">교실 TV에 띄우고, 학생은 폰의 <b>놀이터 맨 아래 → 교실 게임 참가</b>에 번호 4자리를 넣어요.</p>

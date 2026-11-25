@@ -1115,7 +1115,8 @@ function ranking(A) {
   const periodTitle = period === 'week' ? (info.label || '이번 주') : '통합 누적';
   const periodRange = period === 'week' ? (info.range || '월요일 ~ 일요일') : '전체 학습 기록';
   const rankNo = item => Number(item[metric] || 0) > 0 ? items.findIndex(x => Number(x[metric] || 0) === Number(item[metric] || 0)) + 1 : '—';
-  const scopeOptions = [['all','전체'],['중2','중2'],['중3','중3'],['고1','고1']];
+  // V13.247 단원고2(고2) 학생이 있으면 고2도 고른다.
+  const scopeOptions = [['all','전체'],['중2','중2'],['중3','중3'],['고1','고1'], ...(all.some(p => p.grade === '고2') || scope === '고2' ? [['고2','고2']] : [])];
   const periodOptions = [['week','이번 주'],['all','통합']];
   const showPodium = items.length >= 3 && Number(items[2][metric] || 0) > 0;
   const rows = showPodium ? items.slice(3) : items;
