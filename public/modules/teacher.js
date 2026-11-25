@@ -1,4 +1,5 @@
 import { EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, dayKey } from './core.js';
+import { schoolClasses } from './school-classes.js';
 import { rewardEventEntry } from './reward-events-ui.js';
 import { timingDailyEntry } from './timing-daily-ui.js';
 import { icon, esc, num, date, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
@@ -42,6 +43,8 @@ const ALL_CLASSES = '__ALL__';
 const targetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
 const targetMatches = (target, profile) => target === ALL_CLASSES || profile.class_name === target;
 const examRangeGrade = value => value === ALL_CLASSES ? null : value;
+// V13.247 반 목록은 선생님이 고른 학교마다(단원고2는 고2 한 반, school-classes.js).
+const activeSchoolRef = A => ({ id: A.data.profile.active_school_id, division: A.data.profile.active_division });
 const targetCount = (A, value) => A.data.profiles.filter(p => p.active && targetMatches(value, p)).length;
 export function teacherPage(A) {
   const title = tabs.find(t => t[0] === A.tab)?.[1] || '대시보드';
@@ -65,7 +68,7 @@ export function teacherPage(A) {
         <div class="teacher-division-switch" role="group" aria-label="중등부 고등부 변경"><button data-teacher-division="middle" class="${division === 'middle' ? 'selected' : ''}">중등</button><button data-teacher-division="high" class="${division === 'high' ? 'selected' : ''}">고등</button></div>
         <label class="tv2-select"><span>학교</span><select id="teacher-school" aria-label="관리 학교 변경">${schoolOptions}</select></label>
         <span class="tv2-context-gap" aria-hidden="true"></span>
-        <label class="tv2-select"><span>학생 화면</span><select id="preview-grade" aria-label="학생 미리보기 학년/반">${division === 'middle' ? '<option value="중2">중2</option><option value="중3">중3</option>' : '<option value="고1A">고1A</option><option value="고1B">고1B</option>'}</select></label>
+        <label class="tv2-select"><span>학생 화면</span><select id="preview-grade" aria-label="학생 미리보기 학년/반">${schoolClasses(activeSchoolRef(A)).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></label>
         <button class="btn secondary tv2-preview" data-action="student-preview">${icon('user')}<span>미리보기</span></button>
       </div>
       ${content}
@@ -532,7 +535,7 @@ function tournaments(A) {
 const localDate = n => { const d = new Date(n); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
 export function examDefaults(A) { return A.examForm ??= { title: '', class_name: A.data.profile.active_division === 'middle' ? (A.data.profiles[0]?.class_name || '중3') : ALL_CLASSES, exam_type: 'write_meaning', question_count: 20, minutes: 10, passing_score: 80, max_attempts: 1, available: localDate(Date.now()), due: localDate(Date.now() + 3 * 86400000), release_result: true }; }
 const field = (label, name, value, type = 'text', extra = '') => `<label class="field"><span>${label}</span><input name="${name}" value="${esc(value)}" type="${type}" required ${extra}></label>`;
-const divisionClasses = A => A.data.profile.active_division === 'middle' ? ['중2','중3'] : ['고1A','고1B'];
+const divisionClasses = A => schoolClasses(activeSchoolRef(A));
 const classSelect = (A, label, name, value) => {
   const options = [...new Set([...divisionClasses(A), value].filter(v => v && v !== ALL_CLASSES))];
   const allOption = A.data.profile.active_division === 'high'

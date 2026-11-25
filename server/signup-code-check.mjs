@@ -6,14 +6,15 @@ import { fileURLToPath } from 'node:url';
 import { emptyState, migrateState } from './state.mjs';
 import { passwordHash } from './auth.mjs';
 import { service } from './service.mjs';
-import { selfSignup, checkSignupCode, signupCodeGuard, SIGNUP_CODE_MESSAGE, SIGNUP_CODE_FAIL_MAX, CLASS_BY_DIVISION } from './signup.mjs';
+import { selfSignup, checkSignupCode, signupCodeGuard, SIGNUP_CODE_MESSAGE, SIGNUP_CODE_FAIL_MAX } from './signup.mjs';
+import { schoolClasses } from '../public/modules/school-classes.js';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 const codeOf = (state, schoolId, className) => state.signupCodes.find(item => item.school_id === schoolId && item.class_name === className)?.code;
 
 export async function runSignupCodeChecks(assert, expectStatus) {
   const state = emptyState();
-  const pairs = state.schools.flatMap(school => (CLASS_BY_DIVISION[school.division] || []).map(className => `${school.id}|${className}`));
+  const pairs = state.schools.flatMap(school => schoolClasses(school).map(className => `${school.id}|${className}`));
   assert(state.signupCodes.length === pairs.length && pairs.every(pair => state.signupCodes.some(item => `${item.school_id}|${item.class_name}` === pair && item.active)), 'V13.141 새 state는 학교·반마다 켜진 가입 코드가 하나씩 있다');
   assert(state.signupCodes.every(item => /^[A-HJKMNP-Z2-9]{6}$/.test(item.code)) && new Set(state.signupCodes.map(item => item.code)).size === state.signupCodes.length, 'V13.141 가입 코드는 서로 다른 6자리 영문·숫자(헷갈리는 0·O·1·I·L 없음)');
 
@@ -53,7 +54,7 @@ export async function runSignupCodeChecks(assert, expectStatus) {
   state.profiles.push({ id: 'code-teacher', role: 'teacher', username: 'code_teacher', password_hash: await passwordHash('CodeTeacher123!'), display_name: '코드 선생님', active: true, created_at: Date.now() });
   const teacher = await service(state, 'POST', '/login', { username: 'code_teacher', password: 'CodeTeacher123!', role: 'teacher', division: 'high' }, null);
   const teacherBoot = await service(state, 'GET', '/bootstrap', {}, teacher._cookie);
-  const highRows = state.schools.filter(school => school.division === 'high').length * 2;
+  const highRows = state.schools.filter(school => school.division === 'high').reduce((n, school) => n + schoolClasses(school).length, 0); // V13.247 단원고2는 고2 한 반
   assert(teacherBoot.signup_codes?.length === highRows && teacherBoot.signup_codes.every(row => row.code && row.active && row.school) && teacherBoot.signup_codes.some(row => row.code === gangseoA), 'V13.141 선생님 첫 화면에는 지금 부서(고등부) 학교의 반별 가입 코드 표가 있다');
   assert(!teacherBoot.signup_codes.some(row => row.school_id === 'wonil-middle'), 'V13.141 다른 부서(중등부) 코드는 고등부 표에 없다');
   await service(state, 'PATCH', '/teacher/school', { school_id: 'gangseo-high' }, teacher._cookie);

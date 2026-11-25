@@ -32,6 +32,8 @@ import { ybmKimFinalBooks } from './high-vocab-ybm-kim-final.mjs';
 import { ybmParkSeonbuBooks } from './high-vocab-ybm-park-seonbu.mjs';
 import { gangseoSepMockBook } from './gangseo-sep-mock.mjs';
 import { danwonSepMockBook } from './danwon-sep-mock.mjs';
+import { danwon2SepMockBook } from './danwon2-sep-mock.mjs';
+import { schoolClassAllowed, schoolGrades } from '../public/modules/school-classes.js';
 import { compactSession } from './state.mjs';
 import { trimSummary, trimArchive, trimRecords, attemptTotal, autoTrimSessions } from './storage-trim.mjs';
 import { isArchived, restoreSession, restoreInState } from './session-archive.mjs';
@@ -156,8 +158,9 @@ const id = () => randomUUID();
 const DIVISIONS = ['middle', 'high'];
 const ALL_CLASSES = '__ALL__';
 const divisionLabel = division => division === 'middle' ? '중등부' : '고등부';
-const divisionClassAllowed = (division, className) => division === 'middle' ? ['중2','중3'].includes(className) : ['고1A','고1B'].includes(className);
-const examClassAllowed = (division, className) => division === 'high' && className === ALL_CLASSES ? true : divisionClassAllowed(division, className);
+// V13.247 반 목록은 학교마다(단원고2는 고2 한 반, public/modules/school-classes.js).
+const divisionClassAllowed = (school, className) => schoolClassAllowed(school, className);
+const examClassAllowed = (school, className) => school?.division === 'high' && className === ALL_CLASSES ? true : divisionClassAllowed(school, className);
 const examWordGrade = className => className === ALL_CLASSES ? null : className;
 const examTargetMatches = (exam, profile) => !!exam && !!profile && (exam.class_name === ALL_CLASSES || exam.class_name === profile.class_name);
 const normalizedSchoolRef = value => str(value, 80).replace(/\s+/g, '');
@@ -443,7 +446,7 @@ export function dailyQuestProgress(sessions, activePractice, target, now = Date.
 // V13.112 시험 구분: every book is of 'midterm' (중간고사) or 'final' (기말고사). The books that were there before
 // the final exam words came are all 중간고사; the final ones carry exam_period: 'final' themselves.
 const withExamPeriod = book => book.exam_period === 'final' || book.exam_period === 'midterm' ? book : { ...book, exam_period: 'midterm' };
-export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, seonbuExternalFinalBook, ...middleGrade2Books, ...middleGrade3Books, ...ybmKimHighBooks, ...ybmKimFinalBooks, ...ybmParkSeonbuBooks, gangseoSepMockBook, danwonSepMockBook, ...state.extraBooks].map(withExamPeriod); }
+export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, seonbuExternalFinalBook, ...middleGrade2Books, ...middleGrade3Books, ...ybmKimHighBooks, ...ybmKimFinalBooks, ...ybmParkSeonbuBooks, gangseoSepMockBook, danwonSepMockBook, danwon2SepMockBook, ...state.extraBooks].map(withExamPeriod); }
 export function scopedWords(state, schoolRef, ranges, grade = null) {
   const school = schoolByRef(state, schoolRef);
   if (!school || !Array.isArray(ranges) || !ranges.length) fail('학교와 범위를 선택해주세요.');
@@ -1338,6 +1341,16 @@ export async function service(state, method, path, body, token, options = {}) {
     const studentProfiles = state.profiles.filter(x => x.role === 'student' && x.division === selectedDivision && (!teacher || (sameSchool(x, selectedSchool) && !x.preview_owner_id)));
     const studentIds = new Set(studentProfiles.map(s => s.id));
     const sessions = state.sessions.filter(s => s.division === selectedDivision && sameSchool(s, selectedSchool) && (teacher ? studentIds.has(s.student_id) : s.student_id === p.id)).sort((a, b) => b.created_at - a.created_at);
+    // V13.247 학교를 옮긴 학생(예: 단원고 → 단원고2): 코인 · 경험치 · 레벨 · 연속 학습은 사람마다라 전 학교 연습도 센다
+    // (서버가 코인을 쓸 때 세는 것과 같게). 연습 기록 목록 · 결과 분석은 범위 이름이 학교마다라 지금 학교 것만(위 sessions).
+    // 학교를 옮긴 적 없는 학생은 다른 학교 기록이 없어 전과 같다.
+    const carried = new Map();
+    for (const s of state.sessions) {
+      if (s.division !== selectedDivision || !s.school_id || sameSchool(s, selectedSchool) || !(teacher ? studentIds.has(s.student_id) : s.student_id === p.id)) continue;
+      if (!carried.has(s.student_id)) carried.set(s.student_id, []);
+      carried.get(s.student_id).push(s);
+    }
+    const statSessions = (id, own) => carried.has(id) ? [...own, ...carried.get(id)].sort((a, b) => b.created_at - a.created_at) : own;
     const sessionsByStudent = new Map();
     if (teacher) for (const session of sessions) {
       if (!sessionsByStudent.has(session.student_id)) sessionsByStudent.set(session.student_id, []);
@@ -1375,10 +1388,10 @@ export async function service(state, method, path, body, token, options = {}) {
       assignment_id: activePractice.assignment_id || null,
       daily_quest: !!activePractice.daily_quest
     } : null;
-    return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, arena_invite: p.role === 'student' ? arenaInviteFor(state, p, schoolForProfile(state, p), Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
+    return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, statSessions(p.id, sessions)), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, arena_invite: p.role === 'student' ? arenaInviteFor(state, p, schoolForProfile(state, p), Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
       // V13.215 선생님: 학생 목록은 화면이 쓰는 칸만, 연습 기록은 오늘 것 + 최근 실전시험 6개만(server/teacher-home.mjs).
       // 학생별 이번 주 · 지난주 · 마지막 학습은 session_digest, 전체 기록은 결과 분석 탭의 GET /teacher/records.
-      profiles: teacher ? studentProfiles.map(s => ({ ...teacherStudentRow(s, stats(state, s, sessionsByStudent.get(s.id) || [], battlesByStudent)), active_at: lastActiveAt(s) })) : [],
+      profiles: teacher ? studentProfiles.map(s => ({ ...teacherStudentRow(s, stats(state, s, statSessions(s.id, sessionsByStudent.get(s.id) || []), battlesByStudent)), active_at: lastActiveAt(s) })) : [],
       sessions: teacher ? homeSessions(sessions, dayKey, now).map(sessionSummary) : sessions.map(hydrateSession), exams: visibleExams,
       session_digest: teacher ? sessionDigest(sessions, now) : null,
       sessions_scope: teacher ? 'home' : 'all',
@@ -1464,7 +1477,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const school = schoolByRef(state, body.school_id || body.school || p.active_school_id);
     if (!school || !p.school_ids?.includes(school.id)) fail('미리보기 학교를 확인해주세요.', 403);
     const grade = str(body.grade, 20);
-    if (!divisionClassAllowed(school.division, grade)) fail('미리보기 학년/반을 확인해주세요.', 400);
+    if (!divisionClassAllowed(school, grade)) fail('미리보기 학년/반을 확인해주세요.', 400);
     const previewId = `teacher-preview:${p.id}:${school.id}:${grade}`;
     let preview = state.profiles.find(item => item.id === previewId);
     if (!preview) {
@@ -2084,8 +2097,8 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!school) fail('관리 학교를 확인해주세요.', 409);
     const now = Date.now(), kind = body.kind === 'fish' ? 'fish' : 'treasure';
     const className = str(body.class_name, 20), grade = gradeOf(className);
-    const grades = school.division === 'middle' ? ['중2', '중3'] : ['고1'];
-    if (!grades.includes(grade) || (className !== grade && !divisionClassAllowed(school.division, className))) fail('학년·반을 확인해주세요.');
+    const grades = schoolGrades(school);
+    if (!grades.includes(grade) || (className !== grade && !divisionClassAllowed(school, className))) fail('학년·반을 확인해주세요.');
     const rangeCodes = [...new Set((Array.isArray(body.range_codes) ? body.range_codes : []).map(String))].slice(0, 60);
     if (!rangeCodes.length) fail('단어 범위를 골라주세요.');
     const questions = battleQuestions(scopedWords(state, school.id, rangeCodes, className), 'speed', 100);
@@ -2701,8 +2714,8 @@ export async function service(state, method, path, body, token, options = {}) {
     const now = Date.now();
     const className = str(body.class_name, 20);
     const grade = gradeOf(className);
-    const grades = school.division === 'middle' ? ['중2', '중3'] : ['고1'];
-    if (!grades.includes(grade) || (className !== grade && !divisionClassAllowed(school.division, className))) fail('대회 학년·반을 확인해주세요.');
+    const grades = schoolGrades(school);
+    if (!grades.includes(grade) || (className !== grade && !divisionClassAllowed(school, className))) fail('대회 학년·반을 확인해주세요.');
     const ids = [...new Set((Array.isArray(body.student_ids) ? body.student_ids : []).map(value => str(value, 80)).filter(Boolean))];
     if (ids.length < TOURNAMENT_MIN_PLAYERS || ids.length > TOURNAMENT_MAX_PLAYERS) fail(`참가 학생은 ${TOURNAMENT_MIN_PLAYERS}~${TOURNAMENT_MAX_PLAYERS}명으로 골라주세요.`);
     // V13.198 학교별 단어 대회: `schools: [{ school_id, range_codes }]`로 맡은 다른 학교(같은 부)도 함께. 학교마다 자기 범위.
@@ -2847,7 +2860,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (state.profiles.some(p => p.username === username)) fail('이미 사용 중인 아이디입니다.');
     if (String(body.password || '').length < 8 || String(body.password).length > 128) fail('비밀번호는 8~128자로 입력해주세요.');
     if (!str(body.display_name) || !str(body.class_name)) fail('이름, 반, 학교를 확인해주세요.');
-    if (!divisionClassAllowed(school.division, str(body.class_name, 30))) fail(`${divisionLabel(school.division)} 반을 선택해주세요.`);
+    if (!divisionClassAllowed(school, str(body.class_name, 30))) fail(`${divisionLabel(school.division)} 반을 선택해주세요.`);
     const student = { id: id(), role: 'student', username, password_hash: await passwordHash(body.password), display_name: str(body.display_name, 40), class_name: str(body.class_name, 30), division: school.division, school_id: school.id, school: school.name, active: true, created_at: Date.now() };
     state.profiles.push(student); return publicProfile(student);
   }
@@ -2859,7 +2872,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const nextSchool = body.school_id || body.school ? schoolByRef(state, body.school_id || body.school) : currentSchool;
     if (!nextSchool || !p.school_ids?.includes(nextSchool.id) || nextSchool.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학교를 확인해주세요.', 403);
     const nextClass = str(body.class_name, 30) || student.class_name;
-    if (!divisionClassAllowed(nextSchool.division, nextClass)) fail(`${divisionLabel(nextSchool.division)} 반을 선택해주세요.`);
+    if (!divisionClassAllowed(nextSchool, nextClass)) fail(`${divisionLabel(nextSchool.division)} 반을 선택해주세요.`);
     // V13.141: 새로 가입한 학생의 이름도 선생님이 바로 고친다.
     if (body.display_name !== undefined) {
       const displayName = str(body.display_name, 40);
@@ -3097,8 +3110,8 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!school || !p.school_ids?.includes(school.id) || school.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학교를 확인해주세요.', 403);
     const targetClass = str(body.class_name, 30);
     if (!str(body.title) || !targetClass) fail('제목과 대상을 입력해주세요.');
-    if (path === '/assignments' && !divisionClassAllowed(school.division, targetClass)) fail(`${divisionLabel(school.division)} 반을 선택해주세요.`);
-    if (path === '/exams' && !examClassAllowed(school.division, targetClass)) fail(school.division === 'high' ? '학교 전체 또는 고등부 반을 선택해주세요.' : '중등부 반을 선택해주세요.');
+    if (path === '/assignments' && !divisionClassAllowed(school, targetClass)) fail(`${divisionLabel(school.division)} 반을 선택해주세요.`);
+    if (path === '/exams' && !examClassAllowed(school, targetClass)) fail(school.division === 'high' ? '학교 전체 또는 고등부 반을 선택해주세요.' : '중등부 반을 선택해주세요.');
     const words = scopedWords(state, school.id, body.range_codes, path === '/exams' ? examWordGrade(targetClass) : targetClass);
     const due = Number(body.due_at); if (!Number.isFinite(due) || due <= Date.now()) fail('마감 시간을 확인해주세요.');
     const common = { id: id(), teacher_id: p.id, title: str(body.title), class_name: targetClass, division: school.division, school_id: school.id, school: school.name, range_codes: [...new Set(body.range_codes.map(String))], book_id: words[0].book_id, active: true, created_at: Date.now(), due_at: due };
@@ -3136,7 +3149,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!locked) {
       const ranges = body.range_codes !== undefined ? [...new Set((body.range_codes || []).map(String))] : e.range_codes;
       const targetClass = body.class_name !== undefined ? str(body.class_name, 30) : e.class_name;
-      if (!examClassAllowed(school.division, targetClass)) fail(school.division === 'high' ? '학교 전체 또는 고등부 반을 선택해주세요.' : '중등부 반을 선택해주세요.');
+      if (!examClassAllowed(school, targetClass)) fail(school.division === 'high' ? '학교 전체 또는 고등부 반을 선택해주세요.' : '중등부 반을 선택해주세요.');
       const words = scopedWords(state, school.id, ranges, examWordGrade(targetClass));
       if (body.class_name !== undefined) e.class_name = targetClass;
       if (body.range_codes !== undefined) { e.range_codes = ranges; e.book_id = words[0].book_id; }
