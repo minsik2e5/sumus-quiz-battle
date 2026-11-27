@@ -4,8 +4,10 @@ export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;'
 export const num = n => Number(n || 0).toLocaleString('ko-KR');
 export const date = n => new Date(n).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' });
 export const time = n => `${Math.floor(Math.max(0, n) / 60)}:${String(Math.floor(Math.max(0, n) % 60)).padStart(2, '0')}`;
-export const rangeLabel = (school, code) => /^L\d+$/.test(String(code)) ? `${String(code).slice(1)}과` : school === '선부고' ? `외부 ${code}` : `${code}번`;
-export const recordRangeLabel = (context, code) => context?.division === 'middle' ? `${code}과` : rangeLabel(context?.school, code);
+// V13.249 예비고1 단어장 범위('1일' … '60일')는 이름 그대로 보인다.
+export const isDayRange = code => /^\d+일$/.test(String(code));
+export const rangeLabel = (school, code) => isDayRange(code) ? String(code) : /^L\d+$/.test(String(code)) ? `${String(code).slice(1)}과` : school === '선부고' ? `외부 ${code}` : `${code}번`;
+export const recordRangeLabel = (context, code) => isDayRange(code) ? String(code) : context?.division === 'middle' ? `${code}과` : rangeLabel(context?.school, code);
 export const scope = e => (e.range_codes || []).map(c => recordRangeLabel(e, c)).join(' · ');
 const paths = {
   home: '<path d="m3 10 9-7 9 7v10H4V10"/><path d="M9 20v-7h6v7"/>',

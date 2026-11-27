@@ -33,6 +33,7 @@ import { ybmParkSeonbuBooks } from './high-vocab-ybm-park-seonbu.mjs';
 import { gangseoSepMockBook } from './gangseo-sep-mock.mjs';
 import { danwonSepMockBook } from './danwon-sep-mock.mjs';
 import { danwon2SepMockBook } from './danwon2-sep-mock.mjs';
+import { prehigh1Book } from './prehigh1-vocab.mjs'; // V13.249 원일중 예비고1 1800단어
 import { schoolClassAllowed, schoolGrades, schoolClasses } from '../public/modules/school-classes.js';
 import { compactSession } from './state.mjs';
 import { trimSummary, trimArchive, trimRecords, attemptTotal, autoTrimSessions } from './storage-trim.mjs';
@@ -479,7 +480,15 @@ export function dailyQuestProgress(sessions, activePractice, target, now = Date.
 // V13.112 시험 구분: every book is of 'midterm' (중간고사) or 'final' (기말고사). The books that were there before
 // the final exam words came are all 중간고사; the final ones carry exam_period: 'final' themselves.
 const withExamPeriod = book => book.exam_period === 'final' || book.exam_period === 'midterm' ? book : { ...book, exam_period: 'midterm' };
-export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, seonbuExternalFinalBook, ...middleGrade2Books, ...middleGrade2FinalBooks, ...middleGrade3Books, ...ybmKimHighBooks, ...ybmKimFinalBooks, ...ybmParkSeonbuBooks, gangseoSepMockBook, danwonSepMockBook, danwon2SepMockBook, ...state.extraBooks].map(withExamPeriod); }
+// V13.249 큰 단어장(client_slim, 예비고1 1800단어)은 첫 화면에 정답 인정 목록(accepted_meanings)을 싣지 않는다.
+// 채점은 서버가 책 원본으로 하고 화면은 그 칸을 쓰지 않는다. 책마다 한 번만 만들어 둔다.
+const slimBooks = new WeakMap();
+function clientBook(book) {
+  if (!book.client_slim) return book;
+  if (!slimBooks.has(book)) slimBooks.set(book, { ...book, words: book.words.map(({ accepted_meanings, ...w }) => w) });
+  return slimBooks.get(book);
+}
+export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, seonbuExternalFinalBook, ...middleGrade2Books, ...middleGrade2FinalBooks, ...middleGrade3Books, ...ybmKimHighBooks, ...ybmKimFinalBooks, ...ybmParkSeonbuBooks, gangseoSepMockBook, danwonSepMockBook, danwon2SepMockBook, prehigh1Book, ...state.extraBooks].map(withExamPeriod); }
 export function scopedWords(state, schoolRef, ranges, grade = null) {
   const school = schoolByRef(state, schoolRef);
   if (!school || !Array.isArray(ranges) || !ranges.length) fail('학교와 범위를 선택해주세요.');
@@ -1393,7 +1402,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const attempts = state.examAttempts.filter(a => teacher ? visibleExamIds.has(a.exam_id) && !previewIds.has(a.student_id) : a.student_id === p.id);
     // V13.131: 학생마다 대결 목록 전체를 다시 훑지 않게 한 번 나눠 둔다.
     const battlesByStudent = teacher ? battleIndex(state) : null;
-    const books = allBooks(state).filter(b => sameSchool(b, selectedSchool) && (teacher || !b.grade || b.grade === p.class_name));
+    const books = allBooks(state).filter(b => sameSchool(b, selectedSchool) && (teacher || !b.grade || b.grade === p.class_name)).map(clientBook);
     const schools = (teacher ? teacherSchools(state, p, selectedDivision) : [selectedSchool]).filter(Boolean).map(s => ({ id: s.id, name: s.name, full_name: s.full_name, division: s.division }));
     const profile = { ...publicProfile(p), division: selectedDivision, ...(teacher && selectedSchool ? { active_division: selectedDivision, active_school_id: selectedSchool.id, active_school: selectedSchool.name } : {}) };
     const meaningDisputes = state.meaningDisputes.filter(item => teacher ? (item.school_id === selectedSchool.id && item.division === selectedDivision) : item.student_id === p.id).sort((a, b) => b.created_at - a.created_at);

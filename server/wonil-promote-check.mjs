@@ -17,6 +17,10 @@ import { teamOf } from './school-league.mjs';
 import { gradeExtraMs } from './dungeon-engine.mjs';
 import { schoolClasses, schoolGrades, gradeTargets, schoolClassAllowed } from '../public/modules/school-classes.js';
 import { READ_POSTS, VIEW_POSTS } from './mutation-coordinator.mjs';
+import { RESPONSE_BUDGET_KB } from './perf-budget.mjs';
+import { prehigh1Book, PREHIGH1_BOOK_ID } from './prehigh1-vocab.mjs';
+import { grade } from '../public/modules/core.js';
+import { rangeLabel, recordRangeLabel } from '../public/modules/ui.js';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 // 다른 학교 학생 화면(V13.248.0과 같아야 한다): 학교, 반, 책 수, 범위 수, 단어 수.
@@ -131,19 +135,19 @@ export async function runWonilPromoteChecks(assert, expectStatus) {
   assert(teacherRow?.class_name === '예비고1' && teacherRow.stats.points_balance === before.stats.points_balance && teacherRow.stats.practice_count === before.stats.practice_count, 'V13.249 선생님 학생 관리에도 옮긴 학생의 코인 · 연습 수가 그대로');
 
   /* ---------- 예비고1: 중3 책 안 보임 · 빈 화면 안 깨짐 ---------- */
-  assert(after.books.length === 0 && !after.books.some(b => b.grade === '중3') && after.exams.length === 0 && after.assignments.length === 0 && after.word_mastery.total_ranges === 0 && after.profile.division === 'middle' && after.profile.school === '원일중',
-    'V13.249 예비고1 학생에게는 중3 책이 안 보이고(책 0권), 닫힌 중3 시험 · 과제도 안 보인다');
+  assert(after.books.map(b => b.id).join() === PREHIGH1_BOOK_ID && !after.books.some(b => b.grade === '중3') && after.exams.length === 0 && after.assignments.length === 0 && after.word_mastery.total_ranges === 60 && after.profile.division === 'middle' && after.profile.school === '원일중',
+    'V13.249 예비고1 학생에게는 중3 책이 안 보이고 예비고1 1800단어 책 하나만(60범위), 닫힌 중3 시험 · 과제도 안 보인다');
   assert(Array.isArray(after.ranking) && after.ranking.some(r => r.is_me && r.grade === '예비고1') && after.rewards && after.titles && after.stats, 'V13.249 예비고1 학생 첫 화면(순위 · 보상 · 칭호 · 통계)이 정상으로 온다');
   assert(g3.every(b => runtime.some(x => x.id === b.id)), 'V13.249 중3 책은 지우지 않는다(나중에 새 중3이 본다)');
   const friends = (await service(state, 'GET', '/battle/friends', {}, t['qa-wp-a'])).friends.map(f => f.id);
   assert(friends.includes('qa-wp-b') && !friends.includes('qa-wp-d') && !friends.some(id => ['qa-wp-1a', 'qa-wp-2', 'qa-wp-sb', 'qa-wp-gs'].includes(id)), 'V13.249 예비고1 야차전 친구는 예비고1끼리만(중2 · 고1 · 고2 아님)');
-  await expectStatus(400, () => service(state, 'POST', '/practice/start', { range_codes: [code3], mode: 'eng2mean_mc', target: 10 }, t['qa-wp-a']), 'V13.249 예비고1은 중3 범위로 연습을 시작할 수 없다');
+  await expectStatus(400, () => service(state, 'POST', '/practice/start', { range_codes: [code3], mode: 'write_meaning', target: 10, run_mode: 'practice' }, t['qa-wp-a']), 'V13.249 예비고1은 중3 범위로 연습을 시작할 수 없다');
   await service(state, 'POST', '/teacher/student-preview', { school_id: 'wonil-middle', grade: '예비고1' }, tt);
   assert(state.profiles.find(p => p.id === 'teacher-preview:qa-wp-t:wonil-middle:예비고1')?.class_name === '예비고1', 'V13.249 선생님 미리보기에서 예비고1 학생 화면을 본다');
   const made = await service(state, 'POST', '/students', { username: 'qa_wp_new', password: 'QaWpNew123!', display_name: '예비고1등록', class_name: '예비고1', school_id: 'wonil-middle' }, tt);
   assert(made.class_name === '예비고1' && made.school_id === 'wonil-middle', 'V13.249 선생님이 예비고1 학생을 등록한다');
   const pool = await service(state, 'GET', '/teacher/tournament-pool', { grade: '예비고1' }, tt);
-  assert(pool.grade === '예비고1' && pool.schools.length === 1 && pool.schools[0].students.some(s => s.id === 'qa-wp-a') && !pool.schools[0].students.some(s => s.id === 'qa-wp-d') && pool.schools[0].ranges.length === 0, 'V13.249 대회 학생 목록: 예비고1은 예비고1만(단어는 아직 없음)');
+  assert(pool.grade === '예비고1' && pool.schools.length === 1 && pool.schools[0].students.some(s => s.id === 'qa-wp-a') && !pool.schools[0].students.some(s => s.id === 'qa-wp-d') && pool.schools[0].ranges.length === 60, 'V13.249 대회 학생 목록: 예비고1은 예비고1만, 범위는 1~60일');
 
   /* ---------- 다른 학교 화면 그대로 ---------- */
   for (const [schoolId, cls2, nBooks, nRanges, nWords] of OTHERS) {
@@ -160,17 +164,42 @@ export async function runWonilPromoteChecks(assert, expectStatus) {
     'V13.249 중2 → 중3 뒤에도 예비고1과 섞이지 않는다');
   const new3 = await boot('qa-wp-d');
   assert(new3.books.length === g3.length && new3.books.every(b => b.grade === '중3') && !new3.exams.some(e => e.id === exam3.id) && !new3.assignments.some(a => a.id === asg3.id), 'V13.249 새 중3은 중3 책을 보고, 지난해 중3 시험 · 과제(닫힘)는 다시 보이지 않는다');
-  assert((await boot('qa-wp-a')).books.length === 0 && !sameGradeBand(state.profiles.find(p => p.id === 'qa-wp-a'), state.profiles.find(p => p.id === 'qa-wp-d')), 'V13.249 예비고1은 여전히 책 0권이고 새 중3과 야차전 학년이 다르다');
+  assert((await boot('qa-wp-a')).books.map(b => b.id).join() === PREHIGH1_BOOK_ID && !sameGradeBand(state.profiles.find(p => p.id === 'qa-wp-a'), state.profiles.find(p => p.id === 'qa-wp-d')), 'V13.249 예비고1은 여전히 예비고1 책만 보고 새 중3과 야차전 학년이 다르다');
   await expectStatus(409, () => service(state, 'POST', '/teacher/class-move', { from: '중2', to: '중3', count: 0 }, tt), 'V13.249 빈 반은 옮길 것이 없다');
 
   /* ---------- 새 단어: grade '예비고1' 책 하나면 바로 보인다 ---------- */
   state.extraBooks.push({ id: 'qa-wp-pre-book', school_id: 'wonil-middle', school: '원일중', division: 'middle', grade: '예비고1', title: 'QA 예비고1', words: Array.from({ length: 10 }, (_, i) => ({ id: 'qa-wp-pw' + i, word: 'preword' + i, meaning: '예비뜻' + i, range_code: 'P1', grade: '예비고1', school_id: 'wonil-middle' })) });
   const withBook = await boot('qa-wp-a');
-  assert(withBook.books.length === 1 && withBook.books[0].id === 'qa-wp-pre-book' && !(await boot('qa-wp-d')).books.some(b => b.id === 'qa-wp-pre-book'), 'V13.249 grade: 예비고1 책을 더하면 예비고1 학생에게만 바로 보인다');
+  assert(withBook.books.length === 2 && withBook.books.some(b => b.id === 'qa-wp-pre-book') && !(await boot('qa-wp-d')).books.some(b => b.id === 'qa-wp-pre-book'), 'V13.249 grade: 예비고1 책을 더하면 예비고1 학생에게만 바로 보인다');
   state.extraBooks = state.extraBooks.filter(b => b.id !== 'qa-wp-pre-book');
   const rows = Array.from({ length: 8 }, (_, i) => ({ range_code: 'DAY1', word: 'preimport' + i, meaning: '예비가져오기' + i }));
   assert((await service(state, 'POST', '/vocab-import/preview', { grade: '예비고1', rows }, tt)).grade === '예비고1', 'V13.249 중등 단어 파일 등록에서도 예비고1 학년을 고를 수 있다');
   await expectStatus(400, () => service(state, 'POST', '/vocab-import/preview', { grade: '고1A', rows }, tt), 'V13.249 원일중에 없는 반은 단어 등록 학년이 아니다');
+
+  /* ---------- 예비고1 단어장(뜯어먹는 중학영단어 1800, 1~60일) ---------- */
+  const pw = prehigh1Book.words, W = n => pw[n - 1];
+  const tsv = source('../docs/word-sources/prehigh1-1800-plus-300.tsv').trim().split('\n').slice(1).map(line => line.split('\t')).filter(r => Number(r[0]) <= 1800);
+  assert(pw.length === 1800 && tsv.length === 1800 && tsv.every(([n, day, word, meaning], i) => Number(n) === i + 1 && pw[i].word === word && pw[i].meaning === meaning && pw[i].range_code === `${day}일`),
+    'V13.249 예비고1 단어 1800개 · 단어 · 뜻 · 일차가 단어표(1~1800번)와 한 글자도 다르지 않다(61~70일 +300은 넣지 않음)');
+  const perDay = new Map(); for (const w of pw) perDay.set(w.range_code, (perDay.get(w.range_code) || 0) + 1);
+  assert(perDay.size === 60 && [...perDay.values()].every(n => n === 30) && [...perDay.keys()].join() === Array.from({ length: 60 }, (_, i) => `${i + 1}일`).join(), 'V13.249 범위 60개(1일 … 60일), 일차마다 30단어');
+  assert(W(1).word === 'life' && W(1).range_code === '1일' && W(229).word === 'follow' && W(229).range_code === '8일' && W(1800).word === 'upstairs' && W(1800).range_code === '60일' && !pw.some(w => w.word === 'stale'),
+    'V13.249 1 life · 229 follow(8일) · 1800 upstairs(60일), 2100 stale(+300)은 없다');
+  const otherIds = new Set(runtime.filter(b => b.id !== PREHIGH1_BOOK_ID).flatMap(b => b.words || []).map(w => w.id));
+  assert(new Set(pw.map(w => w.id)).size === 1800 && pw.every((w, i) => w.id === `prehigh:ddm1800:${String(i + 1).padStart(4, '0')}` && !otherIds.has(w.id) && w.grade === '예비고1')
+    && prehigh1Book.school_id === 'wonil-middle' && prehigh1Book.grade === '예비고1' && runtime.filter(b => b.grade === '예비고1').length === 1, 'V13.249 id는 prehigh:ddm1800:0001 … 1800, 다른 책과 겹치지 않고, 원일중 · 예비고1 책 한 권');
+  assert(['삶', '인생', '생활', '생명'].every(a => grade('write_meaning', a, W(1))) && grade('write_meaning', '위층에', W(1800)) && grade('write_meaning', '위층으로', W(1800)) && grade('write_meaning', '방식', W(6)) && grade('write_meaning', '데려오다', W(165)) && grade('write_meaning', '따르다', W(229)) && !grade('write_meaning', '생물', W(1)),
+    'V13.249 뜻의 [ ] 대안도 정답(삶[인생/생활] → 인생 · 생활, 위층으로[에] → 위층에, 가져[데려]오다 → 데려오다)');
+  const m2now = await boot('qa-wp-d');
+  assert(!m2now.books.some(b => b.id === PREHIGH1_BOOK_ID) && !(await boot('qa-wp-1a')).books.some(b => b.id === PREHIGH1_BOOK_ID), 'V13.249 예비고1 단어장은 중2 · 중3 · 다른 학교 학생에게 안 보인다');
+  assert(rangeLabel('원일중', '1일') === '1일' && recordRangeLabel({ division: 'middle' }, '60일') === '60일' && recordRangeLabel({ division: 'middle' }, '5') === '5과', 'V13.249 범위 이름은 "1일" 그대로(중등 교과서 범위는 전처럼 "5과")');
+  const prePractice = await service(state, 'POST', '/practice/start', { range_codes: ['1일'], mode: 'write_meaning', target: 10, run_mode: 'practice' }, t['qa-wp-a']);
+  assert(prePractice?.id, 'V13.249 예비고1 학생이 1일 범위로 연습을 시작한다');
+  // 렉 방지: 학생 첫 화면은 단원고 고1(1273단어)과 비슷하게, 선생님 원일중 첫 화면은 예산(400KB) 아래.
+  const preBoot = await boot('qa-wp-a'), bootKb = Math.round(Buffer.byteLength(JSON.stringify(preBoot)) / 1024), danwonKb = Math.round(Buffer.byteLength(JSON.stringify(await boot('qa-wp-1a'))) / 1024);
+  const teacherKb = Math.round(Buffer.byteLength(JSON.stringify(await boot('qa-wp-t'))) / 1024);
+  assert(bootKb <= danwonKb && preBoot.books[0].words.every(w => !('accepted_meanings' in w)) && pw.some(w => w.accepted_meanings?.length) && teacherKb < RESPONSE_BUDGET_KB.teacher_bootstrap,
+    `V13.249 예비고1 학생 첫 화면 ${bootKb}KB(단원고 고1 ${danwonKb}KB 이하, 정답 인정 목록은 서버에만) · 선생님 원일중 첫 화면 ${teacherKb}KB < ${RESPONSE_BUDGET_KB.teacher_bootstrap}KB`);
 
   /* ---------- 화면 ---------- */
   const teacherUi = source('../public/modules/teacher.js'), app = source('../public/app.js'), studentUi = source('../public/modules/student.js'), battle = source('../public/modules/battle.js'), dungeon = source('../public/modules/dungeon.js'), arcade = source('../public/modules/arcade-games.js');

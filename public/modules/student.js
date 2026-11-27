@@ -85,9 +85,9 @@ export function periodFolders(A, codes, { wrap, option, selected = [], count = (
 export const noWordsYet = A => A.data?.profile?.role === 'student' && !(A.data.books || []).some(book => (book.words || []).length);
 // 중등 교과서 어법 · 빈칸영작(중2 YBM · 중3 동아)도 예비고1에게는 안 보인다(중1~3 학생만).
 export const middleTextbookOff = A => A.data?.profile?.division === 'middle' && !/^중[1-3]/.test(String(A.data.profile.class_name || ''));
-export function wordsComingCard(A, more = '') {
+export function wordsComingCard(A, more = '', what = '단어') {
   const grade = A.data?.profile?.class_name || '';
-  return `<section class="words-coming-v13249" data-words-coming role="status"><span aria-hidden="true">📚</span><div><b>${esc(grade)} 새 단어 준비 중이에요</b><p>선생님이 곧 ${esc(grade)} 단어를 올려 주실 거예요. ${more || '그동안 펫 돌보기 · 출석 · 놀이터 코인 게임은 그대로 할 수 있어요.'}</p></div></section>`;
+  return `<section class="words-coming-v13249" data-words-coming role="status"><span aria-hidden="true">📚</span><div><b>${esc(grade)} 새 ${esc(what)} 준비 중이에요</b><p>선생님이 곧 ${esc(grade)} ${esc(what)}를 올려 주실 거예요. ${more || '그동안 펫 돌보기 · 출석 · 놀이터 코인 게임은 그대로 할 수 있어요.'}</p></div></section>`;
 }
 export function getRanges(A, school = A.school, grade = null) {
   const books = A.data.books.filter(book => !grade || !book.grade || book.grade === grade);
@@ -604,7 +604,7 @@ function blankStudy(A) {
   const head = `<div class="study-subhead"><button class="study-back" data-blank-back="true">${icon('back')} ${A.blankGroup ? '본문 목록' : '학습'}</button><span class="pill">WRITING</span></div>`;
   const data = A.blankData;
   if (!data) return `${head}<section class="grammar-empty-school"><div><b>빈칸영작 자료를 불러오고 있어요.</b><p>잠시만 기다려주세요.</p></div></section>`;
-  if (middleTextbookOff(A)) return `${head}${wordsComingCard(A, '예비고1 빈칸영작 자료도 새 단어와 함께 준비할게요.')}`; // V13.249
+  if (middleTextbookOff(A)) return `${head}${wordsComingCard(A, '그동안 단어 학습을 해 주세요.', '빈칸영작 자료')}`; // V13.249
   const done = A.data.rewards?.blank?.done || {}, rate = A.data.rewards?.blank?.rate || {};
   const sets = data.sets;
   const myGrade = /^(중[1-3])/.exec(String(A.data.profile.class_name || ''))?.[1] || '';
@@ -715,7 +715,7 @@ function grammarStudy(A) {
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill green">GRAMMAR</span></div>
   <div class="page-heading grammar-heading"><h1>어법·어휘</h1></div>
   <section class="study-school-card locked"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><span class="school-fixed">${icon('shield')} 선생님 관리</span></section>
-  ${middle && middleTextbookOff(A) ? wordsComingCard(A, '예비고1 어법 자료도 새 단어와 함께 준비할게요.') : middle ? (() => {
+  ${middle && middleTextbookOff(A) ? wordsComingCard(A, '그동안 단어 학습을 해 주세요.', '어법 자료') : middle ? (() => {
     // 중2 학생은 YBM(박준언) 5 · 6 · 7과(기말고사 범위), 중3 학생은 동아(윤정미) 6 · 7과가 먼저 열리고, 다른 교과서 탭도 눌러 볼 수 있다.
     const sets = data.sets || [{ key: 'donga-yoon', grade: '중3', name: '동아(윤정미)', eyebrow: '중3 · 동아(윤정미)', lessons: [6, 7], byLesson }];
     const myGrade = /^(중[1-3])/.exec(String(A.data.profile.class_name || ''))?.[1] || '';
@@ -833,7 +833,7 @@ export function toggleHighChunk(lessonWords, ids, from) {
   return lessonWords.filter(word => set.has(word.id)).map(word => word.id);
 }
 // V13.150 과 이름: 중학생은 'N과'(고등 rangeLabel은 '5번'이 된다).
-const lessonLabel = (A, code) => A.data.profile.division === 'middle' ? `${code}과` : rangeLabel(A.school, code);
+const lessonLabel = (A, code) => A.data.profile.division === 'middle' && !/^\d+일$/.test(String(code)) ? `${code}과` : rangeLabel(A.school, code);
 // V13.127 과 칩: 고른 개수와 얇은 진행 막대.
 function highLessonChip(A, { code, total, picked, on, attr }) {
   const pct = total ? Math.round(picked / total * 100) : 0;
