@@ -1,6 +1,6 @@
 import { api, esc, icon, toast, num, rangeLabel, buttonBusy, modal } from './ui.js';
 import { avatar, expressionSrc, petKey } from './character.js';
-import { getRanges } from './student.js';
+import { getRanges, noWordsYet, wordsComingCard } from './student.js';
 import { comboRank } from './battle-fx.js';
 import { createDungeonFx } from './dungeon-fx.js';
 import { promptFit, optionFit } from './dungeon-fit.js';
@@ -138,6 +138,7 @@ function homeScreen() {
       <div class="dg-hero-copy"><span class="dg-kicker">2~3명 실시간 파티</span><h1>기말고사 지옥</h1><p>1층부터 보스 <b>킬러 골렘</b>까지 쉬지 않고 올라가요. 같은 학년이면 학교가 달라도 함께해요.</p></div>
     </section>
     ${tabsBar()}
+    ${!codes.length && noWordsYet(A) ? wordsComingCard(A, '단어가 올라오면 친구와 던전에 들어갈 수 있어요.') : ''}
     ${rw ? `<section class="dg-card dg-rw-home"><h2>보상 <small>오늘 보상 판 ${num(rw.plays_left)}/${num(rw.daily)}</small></h2><div class="dg-rw-firsts">${['c3', 'c2', 'c1'].map(k => { const c = h.cuts.find(x => x.key === k); return `<div class="${c?.cleared ? 'done' : ''}">${coin()}<b>${num(rw.first[k])}</b><small>${esc(c?.name || '')} 처음 클리어${c?.cleared ? ' ✓' : ''}</small></div>`; }).join('')}</div><p class="dg-hint">처음 깨면 코인과 칭호! 다시 깨거나 져도 하루 ${num(rw.daily)}판까지 정답 수 · 도달 층만큼 코인(한 판 최대 ${num(rw.again_max.c3)}~${num(rw.again_max.c1)}). 만점 모드는 5층마다 처음 도달 보상.</p></section>` : ''}
     ${h.invites?.length ? `<section class="dg-card dg-invites"><h2>받은 초대</h2>${h.invites.map(r => `<div class="dg-invite"><div><b>${esc(r.host)}</b><span>${esc(r.host_school)} · ${esc(r.cut_name)} · ${r.members}/${r.max}명</span></div><button type="button" class="btn primary" data-dg="accept" data-code="${esc(r.code)}">같이 가기</button><button type="button" class="btn ghost" data-dg="decline" data-id="${esc(r.id)}">거절</button></div>`).join('')}</section>` : ''}
     <section class="dg-card">

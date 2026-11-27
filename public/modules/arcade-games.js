@@ -2,7 +2,7 @@
 // 짝 맞추기와 교실 게임은 야차전 '게임' 탭에 있다가 놀이터로 옮겨 왔다(야차전은 겨루기만: 대결 · 몬스터 · 던전 · 기록).
 // 게임 단어는 야차전 '단어 범위'와 같은 저장값(sumus-yacha-ranges:<학생>)을 쓴다. 한쪽에서 바꾸면 다른 쪽도 같다.
 import { esc, num, toast, rangeLabel } from './ui.js';
-import { getRanges, periodGroups } from './student.js';
+import { getRanges, periodGroups, noWordsYet } from './student.js';
 import { openSheet } from './sheet.js';
 import { uiArt, coin } from './emblems.js';
 import { matchTime } from './match-rules.js';
@@ -60,7 +60,7 @@ export function matchCard(A, art) {
         <li><b>${m.best ? matchTime(m.best) : '—'}</b><small>내 최고</small></li>
         <li><b>${num(m.left ?? 5)}</b><small>오늘 코인 판</small></li>
       </ul>
-      <div class="ag-words"><span>게임 단어</span><b class="${w.ok ? 'ok' : 'need'}">${w.picked.length ? `${esc(wordsLabel(A, w.picked))} · ${num(w.n)}단어` : '아직 안 골랐어요'}</b><button type="button" class="btn small" data-action="arcade-words">바꾸기</button></div>
+      <div class="ag-words"><span>게임 단어</span><b class="${w.ok ? 'ok' : 'need'}">${w.picked.length ? `${esc(wordsLabel(A, w.picked))} · ${num(w.n)}단어` : !w.codes.length && noWordsYet(A) ? '새 단어 준비 중' : '아직 안 골랐어요'}</b><button type="button" class="btn small" data-action="arcade-words">바꾸기</button></div>
       <button type="button" class="yl-cta ag-go" data-action="arcade-match" ${w.ok ? '' : 'disabled'}>시작</button>
     </div>
   </article>`;
@@ -77,7 +77,7 @@ export function wallCard(A, art) {
         <li><i class="ag-ico">🧱</i><b>${v.best ? num(v.best) : '—'}</b><small>최고 점수</small></li>
         <li><b>${num(v.left ?? 5)}</b><small>오늘 코인 판</small></li>
       </ul>
-      <div class="ag-words"><span>게임 단어</span><b class="${w.ok ? 'ok' : 'need'}">${w.picked.length ? `${esc(wordsLabel(A, w.picked))} · ${num(w.n)}단어` : '아직 안 골랐어요'}</b><button type="button" class="btn small" data-action="arcade-words">바꾸기</button></div>
+      <div class="ag-words"><span>게임 단어</span><b class="${w.ok ? 'ok' : 'need'}">${w.picked.length ? `${esc(wordsLabel(A, w.picked))} · ${num(w.n)}단어` : !w.codes.length && noWordsYet(A) ? '새 단어 준비 중' : '아직 안 골랐어요'}</b><button type="button" class="btn small" data-action="arcade-words">바꾸기</button></div>
       <button type="button" class="yl-cta ag-go" data-action="wall-open" ${w.ok ? '' : 'disabled'}>시작</button>
     </div>
   </article>`;
@@ -200,6 +200,7 @@ export function partyRow() {
 // 게임 단어 고르기 창(야차전 '단어 범위'와 같은 저장값). 닫으면 onDone으로 놀이터를 다시 그린다.
 export function openWordsSheet(A, onDone) {
   const { codes, counts } = arcadeWords(A);
+  if (!codes.length) { toast(noWordsYet(A) ? `${A.data.profile.class_name || ''} 새 단어 준비 중이에요. 단어가 올라오면 고를 수 있어요.` : '고를 수 있는 단어 범위가 없어요.'); return; } // V13.249
   const ranges = new Set(arcadeWords(A).picked);
   const groups = periodGroups(A, codes), tabbed = !!groups[0].period;
   let period = tabbed ? (groups.find(group => group.codes.some(code => ranges.has(code))) || groups[0]).period : null;

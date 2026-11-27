@@ -15,7 +15,7 @@ export const EVENT_MAX_OPEN = 20;
 // 끝난 이벤트는 60일 동안 목록에 남는다.
 const EVENT_KEEP_MS = 60 * 86400000;
 const KST_INPUT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
-const GRADES = { middle: ['중1', '중2', '중3'], high: ['고1', '고2', '고3'] };
+const GRADES = { middle: ['중1', '중2', '중3', '예비고1'], high: ['고1', '고2', '고3'] };
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 

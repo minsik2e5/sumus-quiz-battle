@@ -60,7 +60,7 @@ export async function partyCreateModal(A, onOpen) {
   const otherRanges = (x, grade) => { const list = [...x.ranges].sort((a, b) => (b.period === 'final') - (a.period === 'final')), pick = new Set(list.slice(0, 2).map(r => r.code));
     return `<div class="tn-other-range"><div class="step-label">${esc(x.name)} 단어 범위</div><div class="teacher-range">${list.map(r => `<label class="range-option"><input type="checkbox" name="range-${esc(x.id)}" value="${esc(r.code)}" ${pick.has(r.code) ? 'checked' : ''}><span>${esc(/^중/.test(grade) ? `${r.code}과` : rangeLabel(x.name, r.code))}<small>${r.period === 'final' ? '기말 · ' : ''}${num(r.count)}개 단어</small></span></label>`).join('')}</div></div>`; };
   const fillOthers = async () => {
-    const target = $('#pg-target').value, grade = (target.match(/^(중[1-3]|고[1-3])/) || [])[1] || target, whole = target === grade;
+    const target = $('#pg-target').value, grade = (target.match(/^(예비고1|중[1-3]|고[1-3])/) || [])[1] || target, whole = target === grade;
     if (!whole) others.clear();
     const list = whole ? (await poolOf(grade)).filter(x => x.name !== A.school).slice(0, 4) : [];
     if ($('#pg-target').value !== target) return;

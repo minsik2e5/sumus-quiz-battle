@@ -10,6 +10,7 @@ import { dayKey } from '../public/modules/core.js';
 import { ARENA, baseS2, cleanTree } from '../public/modules/arena-rules.js';
 import { LIVE, cleanCode } from '../public/modules/arena-live-rules.js';
 import { gradeOf } from './competition.mjs';
+import { GRADE_BAND } from '../public/modules/school-classes.js';
 import { addBonus, findReceipt, keepReceipt } from './rewards.mjs';
 import { bumpCoinWin, decoOf } from './arena-deco.mjs';
 import { applyRank, liveRatio } from './arena-rank.mjs';
@@ -17,7 +18,8 @@ import { applyRank, liveRatio } from './arena-rank.mjs';
 export const ARENA_INVITES = { MAX: 120, STARTED_KEEP_MS: 30 * 60000 };
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const games = p => p.games ||= {};
-const GRADE = /^(중|고)[1-3]$/;
+// V13.249 예비고1도 한 학년(public/modules/school-classes.js).
+const GRADE = GRADE_BAND;
 
 // 같은 학년끼리(선생님 결정 Q4): 같은 학교 · 같은 학교급 · 같은 학년(반은 달라도 된다). 학년을 모르는 반이면 같은 반만.
 //   school: schoolForProfile 결과({ id, division }). 서버가 초대 · 방 코드 입장 · 끝 보고 때 모두 이것으로 확인한다.

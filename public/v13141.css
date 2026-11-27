@@ -34,3 +34,21 @@
   .new-signup-table-v13141 input.new-name { min-width: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .signup-code-switch i, .signup-code-switch i::after { transition: none; } }
+
+/* V13.249 반 전체 학년 올리기(학생 관리) */
+.class-move-v13249 { margin-top: 16px; padding-bottom: 16px; }
+.class-move-v13249 > .class-move-pick, .class-move-v13249 > .class-move-preview, .class-move-v13249 > p { margin-left: 18px; margin-right: 18px; }
+.class-move-v13249 .class-move-pick { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin: 6px 18px 12px; }
+.class-move-v13249 .class-move-pick .field { flex: 1 1 140px; margin: 0; }
+.class-move-v13249 .class-move-arrow, .class-move-v13249 .class-move-head span { font-weight: 700; color: var(--blue); padding-bottom: 14px; }
+.class-move-v13249 .class-move-preview { border: 1px solid var(--line); border-radius: 16px; padding: 14px; background: var(--blue-soft); display: grid; gap: 10px; }
+.class-move-v13249 .class-move-head { display: flex; align-items: center; gap: 10px; font-size: 18px; }
+.class-move-v13249 .class-move-head span { padding: 0; }
+.class-move-v13249 .class-move-names { font-size: 13px; color: var(--sub); line-height: 1.6; }
+.class-move-v13249 .class-move-notes { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; display: grid; gap: 4px; }
+.class-move-v13249 .class-move-warn { color: var(--red); }
+/* V13.249 학년 책이 없을 때(예비고1 새 단어 준비 중) */
+.words-coming-v13249 { display: flex; gap: 12px; align-items: flex-start; margin: 12px 0; padding: 14px 16px; border-radius: 18px; background: #fff8e6; border: 1px solid #f3dfa6; color: #5b4a17; }
+.words-coming-v13249 > span { font-size: 26px; line-height: 1; }
+.words-coming-v13249 b { display: block; font-size: 16px; }
+.words-coming-v13249 p { font-size: 13px; line-height: 1.6; margin-top: 2px; }

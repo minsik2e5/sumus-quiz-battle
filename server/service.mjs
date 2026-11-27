@@ -33,7 +33,8 @@ import { ybmParkSeonbuBooks } from './high-vocab-ybm-park-seonbu.mjs';
 import { gangseoSepMockBook } from './gangseo-sep-mock.mjs';
 import { danwonSepMockBook } from './danwon-sep-mock.mjs';
 import { danwon2SepMockBook } from './danwon2-sep-mock.mjs';
-import { schoolClassAllowed, schoolGrades } from '../public/modules/school-classes.js';
+import { prehigh1Book } from './prehigh1-vocab.mjs'; // V13.249 원일중 예비고1 1800단어
+import { schoolClassAllowed, schoolGrades, schoolClasses } from '../public/modules/school-classes.js';
 import { compactSession } from './state.mjs';
 import { trimSummary, trimArchive, trimRecords, attemptTotal, autoTrimSessions } from './storage-trim.mjs';
 import { isArchived, restoreSession, restoreInState } from './session-archive.mjs';
@@ -124,7 +125,8 @@ const safeGrammarIndexes = (value, max = 120) => Array.isArray(value)
 const safeGrammarKeys = (value, sentences = 120, choices = 150) => Array.isArray(value)
   ? [...new Set(value.slice(0, 400).map(key => grammarKey(key, sentences)).filter(Boolean))].slice(0, choices)
   : [];
-const MIDDLE_IMPORT_GRADES = ['중2', '중3'];
+// V13.249 중등 단어 파일 등록 학년 = 그 학교 반 목록(원일중은 중2 · 중3 · 예비고1).
+const middleImportGrade = (school, grade) => schoolClassAllowed(school, grade);
 const hashText = value => {
   let hash = 2166136261;
   for (const char of String(value)) { hash ^= char.codePointAt(0); hash = Math.imul(hash, 16777619); }
@@ -329,13 +331,45 @@ function recentRangeResults(list, mastery, limit = 30) {
     .slice(0, limit);
 }
 // V13.148 칭호 '한 과 정복' · '교과서 정복자': 학습 화면의 과 정복(정답률 95% 이상으로 모든 단어를 푼 범위) 수.
-setUnitCounter((state, p) => { const school = p?.role === 'student' ? schoolForProfile(state, p) : null; return school ? wordRangeMastery(state, p.id, school, p.class_name).mastered : 0; });
+// V13.249 반을 옮기면(중3 → 예비고1) 그 학년 책이 안 보여 과 정복 수가 0이 된다. 옮기기 전 수를 unit_best로 남겨 칭호가 사라지지 않게 한다.
+setUnitCounter((state, p) => { const school = p?.role === 'student' ? schoolForProfile(state, p) : null; return Math.max(school ? wordRangeMastery(state, p.id, school, p.class_name).mastered : 0, Number(p?.unit_best || 0)); });
 // V13.191 칭호 4탄 시험 범위: 그 학생 학교 · 학년 책의 범위 상태로 한 바퀴 · 모의고사 책 · 시험 전체를 센다(server/titles-4.mjs rangeCounts).
 function studentRangeCounts(state, p) {
   const school = p?.role === 'student' ? schoolForProfile(state, p) : null;
   return school ? rangeCounts(booksForSchoolGrade(state, school, p.class_name), wordRangeMastery(state, p.id, school, p.class_name).ranges) : null;
 }
 setRangeCounter(studentRangeCounts);
+// V13.249 반 · 학교를 옮기기 직전: 지금 학년 책으로 센 과 정복 · 시험 범위 칭호 수를 학생 프로필에 남긴다(연습이 끝날 때 남기는 것과 같은 칸).
+function keepRangeTitles(state, student) {
+  const school = schoolForProfile(state, student);
+  if (!school) return;
+  const units = wordRangeMastery(state, student.id, school, student.class_name).mastered;
+  if (units > Number(student.unit_best || 0)) student.unit_best = units;
+  rememberRangeBest(student, studentRangeCounts(state, student));
+}
+// V13.249 선생님 "반 전체 학년 올리기"(학생 관리): 지금 고른 학교의 한 반 학생을 모두 다른 반으로 옮긴다.
+// 미리보기(GET)와 옮기기(POST)가 같은 계산을 쓴다. 이 학교 학생만 거르고, 저장은 한 번(요청 하나).
+function classMovePlan(state, teacher, body) {
+  const school = activeTeacherSchool(state, teacher);
+  if (!school) fail('관리 학교를 확인해주세요.', 409);
+  const from = str(body.from, 30), to = str(body.to, 30), classes = schoolClasses(school);
+  if (!classes.includes(from) || !classes.includes(to)) fail(`${school.name}의 반(${classes.join(' · ')})에서 골라주세요.`);
+  if (from === to) fail('옮길 반과 새 반이 같아요.');
+  const inSchool = state.profiles.filter(x => x.role === 'student' && !x.preview_owner_id && schoolForProfile(state, x)?.id === school.id);
+  const students = inSchool.filter(x => x.class_name === from), already = inSchool.filter(x => x.class_name === to);
+  const ids = new Set(students.map(x => x.id));
+  const exams = state.exams.filter(e => e.active && e.class_name === from && sameSchool(e, school));
+  const assignments = state.assignments.filter(a => a.active && a.class_name === from && sameSchool(a, school));
+  const testing = state.examAttempts.filter(a => a.status === 'active' && ids.has(a.student_id) && !examAttemptExpired(a));
+  return { school, from, to, students, already, exams, assignments, testing };
+}
+const classMoveView = plan => ({
+  school_id: plan.school.id, school: plan.school.name, from: plan.from, to: plan.to, count: plan.students.length,
+  names: plan.students.map(x => x.display_name).sort((a, b) => a.localeCompare(b, 'ko')).slice(0, 40),
+  already: plan.already.length,
+  exams: plan.exams.map(e => ({ id: e.id, title: e.title })), assignments: plan.assignments.map(a => ({ id: a.id, title: a.title })),
+  testing: plan.testing.length
+});
 function wordRangeMastery(state, studentId, school, grade = null) {
   if (!school) return { ranges: {}, mastered: 0, perfect: 0, total_ranges: 0, conquest: 0 };
   const words = wordsForSchoolGrade(state, school, grade);
@@ -446,7 +480,15 @@ export function dailyQuestProgress(sessions, activePractice, target, now = Date.
 // V13.112 시험 구분: every book is of 'midterm' (중간고사) or 'final' (기말고사). The books that were there before
 // the final exam words came are all 중간고사; the final ones carry exam_period: 'final' themselves.
 const withExamPeriod = book => book.exam_period === 'final' || book.exam_period === 'midterm' ? book : { ...book, exam_period: 'midterm' };
-export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, seonbuExternalFinalBook, ...middleGrade2Books, ...middleGrade2FinalBooks, ...middleGrade3Books, ...ybmKimHighBooks, ...ybmKimFinalBooks, ...ybmParkSeonbuBooks, gangseoSepMockBook, danwonSepMockBook, danwon2SepMockBook, ...state.extraBooks].map(withExamPeriod); }
+// V13.249 큰 단어장(client_slim, 예비고1 1800단어)은 첫 화면에 정답 인정 목록(accepted_meanings)을 싣지 않는다.
+// 채점은 서버가 책 원본으로 하고 화면은 그 칸을 쓰지 않는다. 책마다 한 번만 만들어 둔다.
+const slimBooks = new WeakMap();
+function clientBook(book) {
+  if (!book.client_slim) return book;
+  if (!slimBooks.has(book)) slimBooks.set(book, { ...book, words: book.words.map(({ accepted_meanings, ...w }) => w) });
+  return slimBooks.get(book);
+}
+export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, seonbuExternalFinalBook, ...middleGrade2Books, ...middleGrade2FinalBooks, ...middleGrade3Books, ...ybmKimHighBooks, ...ybmKimFinalBooks, ...ybmParkSeonbuBooks, gangseoSepMockBook, danwonSepMockBook, danwon2SepMockBook, prehigh1Book, ...state.extraBooks].map(withExamPeriod); }
 export function scopedWords(state, schoolRef, ranges, grade = null) {
   const school = schoolByRef(state, schoolRef);
   if (!school || !Array.isArray(ranges) || !ranges.length) fail('학교와 범위를 선택해주세요.');
@@ -1360,7 +1402,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const attempts = state.examAttempts.filter(a => teacher ? visibleExamIds.has(a.exam_id) && !previewIds.has(a.student_id) : a.student_id === p.id);
     // V13.131: 학생마다 대결 목록 전체를 다시 훑지 않게 한 번 나눠 둔다.
     const battlesByStudent = teacher ? battleIndex(state) : null;
-    const books = allBooks(state).filter(b => sameSchool(b, selectedSchool) && (teacher || !b.grade || b.grade === p.class_name));
+    const books = allBooks(state).filter(b => sameSchool(b, selectedSchool) && (teacher || !b.grade || b.grade === p.class_name)).map(clientBook);
     const schools = (teacher ? teacherSchools(state, p, selectedDivision) : [selectedSchool]).filter(Boolean).map(s => ({ id: s.id, name: s.name, full_name: s.full_name, division: s.division }));
     const profile = { ...publicProfile(p), division: selectedDivision, ...(teacher && selectedSchool ? { active_division: selectedDivision, active_school_id: selectedSchool.id, active_school: selectedSchool.name } : {}) };
     const meaningDisputes = state.meaningDisputes.filter(item => teacher ? (item.school_id === selectedSchool.id && item.division === selectedDivision) : item.student_id === p.id).sort((a, b) => b.created_at - a.created_at);
@@ -2864,6 +2906,26 @@ export async function service(state, method, path, body, token, options = {}) {
     const student = { id: id(), role: 'student', username, password_hash: await passwordHash(body.password), display_name: str(body.display_name, 40), class_name: str(body.class_name, 30), division: school.division, school_id: school.id, school: school.name, active: true, created_at: Date.now() };
     state.profiles.push(student); return publicProfile(student);
   }
+  if (path === '/teacher/class-move' && method === 'GET') {
+    requireRole(p, 'teacher');
+    return classMoveView(classMovePlan(state, p, body));
+  }
+  if (path === '/teacher/class-move' && method === 'POST') {
+    requireRole(p, 'teacher');
+    const plan = classMovePlan(state, p, body);
+    if (!plan.students.length) fail(`${plan.from} 반에 옮길 학생이 없어요.`, 409);
+    // 순서: 새 반에 이미 학생이 있으면 섞이므로 막는다(예: 중3 → 예비고1을 하기 전에 중2 → 중3을 누른 경우).
+    if (plan.already.length) fail(`${plan.to} 반에 이미 학생 ${plan.already.length}명이 있어요. 두 반이 섞이지 않게 ${plan.to} 반을 먼저 옮겨 주세요.`, 409);
+    if (plan.testing.length) fail(`${plan.from} 학생 ${plan.testing.length}명이 지금 시험을 보고 있어요. 시험이 끝난 뒤 옮겨 주세요.`, 409);
+    // 미리보기를 본 뒤 학생 수가 바뀌었으면 다시 확인받는다.
+    if (Number(body.count) !== plan.students.length) fail(`${plan.from} 학생 수가 바뀌었어요(지금 ${plan.students.length}명). 미리보기를 다시 확인해 주세요.`, 409);
+    const now = Date.now();
+    for (const student of plan.students) { keepRangeTitles(state, student); student.class_name = plan.to; student.class_moved_at = now; }
+    // 옛 반 대상 진행 중 시험 · 과제는 닫는다(옛 학년 단어라 새 반에는 안 맞고, 나중에 새로 그 반이 된 학생에게 다시 보이지 않게). 기록은 그대로.
+    for (const e of plan.exams) { e.active = false; e.closed_by_class_move = now; }
+    for (const a of plan.assignments) { a.active = false; a.closed_by_class_move = now; }
+    return { ok: true, ...classMoveView({ ...plan, already: [] }), moved: plan.students.length };
+  }
   if (/^\/students\/[^/]+$/.test(path) && method === 'PATCH') {
     requireRole(p, 'teacher'); const student = state.profiles.find(s => s.id === path.split('/')[2] && s.role === 'student' && !s.preview_owner_id);
     if (!student) fail('학생을 찾을 수 없습니다.', 404);
@@ -2880,6 +2942,7 @@ export async function service(state, method, path, body, token, options = {}) {
       student.display_name = displayName;
     }
     if (typeof body.active === 'boolean') student.active = body.active;
+    if (student.class_name !== nextClass || student.school_id !== nextSchool.id) keepRangeTitles(state, student); // V13.249
     student.class_name = nextClass;
     if (student.school_id !== nextSchool.id) {
       for (const practice of state.practices.filter(item => item.student_id === student.id && !item.finished)) finishPractice(practice, state);
@@ -2914,7 +2977,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const school = activeTeacherSchool(state, p);
     if (!school || school.division !== 'middle' || activeTeacherDivision(p) !== 'middle') fail('중등부 학교에서 사용할 수 있어요.', 403);
     const grade = str(body.grade, 10);
-    if (!MIDDLE_IMPORT_GRADES.includes(grade)) fail('중2 또는 중3을 선택해주세요.');
+    if (!middleImportGrade(school, grade)) fail(`${schoolClasses(school).join(' · ')} 중에서 학년을 선택해주세요.`);
     const normalized = normalizeImportRows(body.rows);
     if (!normalized.rows.length) fail('등록할 수 있는 단어가 없습니다.');
     const rangeCodes = [...new Set(normalized.rows.map(row => row.range_code))];
@@ -2938,7 +3001,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const school = activeTeacherSchool(state, p);
     if (!school || school.division !== 'middle' || activeTeacherDivision(p) !== 'middle') fail('중등부 학교에서 사용할 수 있어요.', 403);
     const grade = str(body.grade, 10);
-    if (!MIDDLE_IMPORT_GRADES.includes(grade)) fail('중2 또는 중3을 선택해주세요.');
+    if (!middleImportGrade(school, grade)) fail(`${schoolClasses(school).join(' · ')} 중에서 학년을 선택해주세요.`);
     const normalized = normalizeImportRows(body.rows);
     if (!normalized.rows.length) fail('등록할 수 있는 단어가 없습니다.');
     const bookId = `import:${school.id}:${grade}`;

@@ -54,9 +54,9 @@ export async function runDanwon2Checks(assert, expectStatus) {
   /* ---------- 반 목록: 단원고2만 고2 ---------- */
   const state = emptyState();
   const school = id => state.schools.find(s => s.id === id);
-  assert(schoolClasses(school('danwon-high-2')).join() === '고2' && schoolClasses(school('danwon-high')).join() === '고1A,고1B' && schoolClasses(school('seonbu-high')).join() === '고1A,고1B' && schoolClasses(school('gangseo-high')).join() === '고1A,고1B' && schoolClasses(school('wonil-middle')).join() === '중2,중3',
-    'V13.247 반 목록: 단원고2 고2, 단원고 · 선부고 · 강서고 고1A · 고1B 그대로, 원일중 중2 · 중3');
-  assert(schoolGrades(school('danwon-high-2')).join() === '고2' && schoolGrades(school('gangseo-high')).join() === '고1' && JSON.stringify(gradeTargets(school('danwon-high-2'))) === '[["고2","고2"]]' && JSON.stringify(gradeTargets(school('danwon-high'))) === '[["고1","고1 전체"],["고1A","고1A"],["고1B","고1B"]]' && JSON.stringify(gradeTargets(school('wonil-middle'))) === '[["중2","중2"],["중3","중3"]]',
+  assert(schoolClasses(school('danwon-high-2')).join() === '고2' && schoolClasses(school('danwon-high')).join() === '고1A,고1B' && schoolClasses(school('seonbu-high')).join() === '고1A,고1B' && schoolClasses(school('gangseo-high')).join() === '고1A,고1B' && schoolClasses(school('wonil-middle')).join() === '중2,중3,예비고1',
+    'V13.247 반 목록: 단원고2 고2, 단원고 · 선부고 · 강서고 고1A · 고1B 그대로, 원일중 중2 · 중3(V13.249 예비고1 더함)');
+  assert(schoolGrades(school('danwon-high-2')).join() === '고2' && schoolGrades(school('gangseo-high')).join() === '고1' && JSON.stringify(gradeTargets(school('danwon-high-2'))) === '[["고2","고2"]]' && JSON.stringify(gradeTargets(school('danwon-high'))) === '[["고1","고1 전체"],["고1A","고1A"],["고1B","고1B"]]' && JSON.stringify(gradeTargets(school('wonil-middle'))) === '[["중2","중2"],["중3","중3"],["예비고1","예비고1"]]',
     'V13.247 대회 · 교실 게임 대상: 단원고2 고2, 다른 고등학교 고1 전체 · 고1A · 고1B, 원일중 중2 · 중3');
   assert(gradeOf('고2') === '고2' && rankGrade({ class_name: '고2', division: 'high' }) === '고2' && rankGrade({ class_name: '고1A', division: 'high' }) === '고1' && !sameGradeBand({ division: 'high', class_name: '고2' }, { division: 'high', class_name: '고1A' }), 'V13.247 고2는 순위 · 야차전 학년이 고1과 따로(고2)');
   const codeRows = signupCodeRows(state, state.schools);

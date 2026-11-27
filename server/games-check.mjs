@@ -126,7 +126,10 @@ export async function runGamesChecks(assert) {
     const round2 = matchPick(words, { random: lcg(5), skip: pairs.map(x => x.id) });
     assert(round2.length === MATCH.PAIRS && round2.every(x => !pairs.some(y => y.id === x.id)), 'V13.152 다음 라운드는 앞 라운드에 나온 단어를 빼고 고른다(단어가 넉넉하면)');
     const realNow = Date.now;
-    let clock = now;
+    // V13.249 시계는 오늘(한국 시각) 낮 12시에서 시작한다. 실제 시각에서 시작하면 밤 11시 50분쯤 돌 때 10분쯤 앞으로 가며 자정을 넘겨
+    // "하루 5판" 검사가 날짜가 바뀌어 실패했다(검사만 고침, 게임 규칙은 그대로).
+    const KST = 9 * 3600000;
+    let clock = Math.floor((now + KST) / DAY) * DAY - KST + 12 * 3600000;
     Date.now = () => clock;
     try {
       // V13.167 화면은 늘 짝마다 시간(splits)을 보낸다: 사람 모양(고르지 않은 간격)으로 만든다. 없으면 의심 기록(순위 · 신기록에서 빠짐).

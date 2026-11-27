@@ -375,7 +375,7 @@ export async function startPractice(options = {}) {
       : A.data.books.flatMap(book => book.words || []).filter(word => (payload.range_codes || []).map(String).includes(String(word.range_code))).length;
     const target = payload.cover_all ? scopedCount : Math.min(scopedCount, Number(payload.target || scopedCount));
     const ranges = Array.isArray(payload.word_ids) && payload.word_ids.length
-      ? (A.data.profile.division === 'middle' ? String(A.middleRange || '') + '과' : '직접 선택')
+      ? (A.data.profile.division === 'middle' ? String(A.middleRange || '') + (/^\d+일$/.test(String(A.middleRange || '')) ? '' : '과') : '직접 선택')
       : (payload.range_codes || []).map(code => recordRangeLabel({ division: A.data.profile.division, school: A.school }, code)).join(' · ');
     const close = modal(`<span class="pill green">실전 모드</span><h2>${esc(ranges || '선택 범위')}</h2><div class="detail-grid"><div><b>${esc(PRACTICE_TYPES[payload.mode] || '쓰기')}</b><small>시험 방식</small></div><div><b>${target}문제</b><small>문항 수</small></div><div><b>마지막 공개</b><small>채점 시점</small></div></div><div class="test-start-rules"><p>정답은 시험이 끝난 뒤 공개돼요.</p><p>이전 문항으로 돌아갈 수 없어요.</p><p>⏳ 시험 전체 <b>${minSec(testDurationSec(payload.mode, target))}</b>이에요. 문제마다 재지 않으니 천천히 풀어요.</p><p>⏭ 헷갈리는 단어는 <b>PASS</b>로 넘기면 마지막에 다시 나와요(한 단어에 한 번).</p><p class="test-leave-rule-v1376">📵 시험 중에 다른 앱·탭으로 나가면 기록돼요. <b>${TEST_LEAVE_LIMIT}번째로 나가면 자동 제출</b>돼요.</p></div><button class="btn primary full" id="confirm-practice-test">실전 시작하기</button><button class="btn full" id="cancel-practice-test">설정으로 돌아가기</button>`, '실전 시작 확인');
     $('#cancel-practice-test').onclick = () => { close(); redraw(); };
