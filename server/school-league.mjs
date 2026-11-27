@@ -1,4 +1,5 @@
 import { rankingWeek, isRankedStudent } from './competition.mjs';
+import { GRADE_HEAD } from '../public/modules/school-classes.js';
 
 // V13.202 학교 대항전(홈 화면): 학원 전체를 팀으로 나눠 이번 주(월~일) 1인 평균 점수로 겨룬다.
 //   팀: 중학교는 학년마다(원일중 중2 · 원일중 중3), 고등학교는 학교마다(단원고 · 선부고 · 강서고).
@@ -8,7 +9,7 @@ import { rankingWeek, isRankedStudent } from './competition.mjs';
 export const SCHOOL_LEAGUE = { TOURNEY: [300, 150], PARTY: [0, 50, 30, 20], PARTY_MIN: 3, CACHE_MS: 60000 };
 const cache = new WeakMap();
 export function teamOf(state, p, schoolOf) {
-  const school = schoolOf(state, p), grade = String(p?.class_name || '').match(/^(중[1-3]|고[1-3])/)?.[1] || '';
+  const school = schoolOf(state, p), grade = String(p?.class_name || '').match(GRADE_HEAD)?.[1] || ''; // V13.249 예비고1은 따로 한 팀
   if (!school || !grade) return null;
   // 중학교 팀은 학년 이름(중2 · 중3)으로 부르고 학교 이름은 작게 함께 보인다. 고등학교 팀은 학교 이름.
   return school.division === 'middle' ? { key: `${school.id}:${grade}`, name: grade, school: school.name } : { key: school.id, name: school.name, school: '' };

@@ -1,7 +1,7 @@
 import { api, esc, icon, toast, num, rangeLabel, modal, dialogOpen, buttonBusy } from './ui.js';
 import { CHARACTERS, PET_FORMS, seasonStage, petReady } from './core.js';
 import { avatar, petKey, showPose, holdPose, preloadPoses } from './character.js';
-import { getRanges, periodFolders, periodGroups } from './student.js';
+import { getRanges, periodFolders, periodGroups, noWordsYet, wordsComingCard } from './student.js';
 import { openSheet } from './sheet.js';
 import { openFriendSheet } from './friend-sheet.js';
 import { petJosa } from './pet-moments.js';
@@ -368,7 +368,7 @@ function playTab(h) {
   const tourneys = A.data.tournaments || [];
   const modeHint = [minutesText(BATTLE_MODES[B.mode].match_ms), ...MODE_FACTS[B.mode]].join(' · ');
   const botLeft = A.data.rewards?.bot?.left ?? BOT_DAILY;
-  return `${tourneys.map(t => tournamentCard(t)).join('')}
+  return `${tourneys.map(t => tournamentCard(t)).join('')}${!codes.length && noWordsYet(A) ? wordsComingCard(A, '단어가 올라오면 친구와 야차전 대결을 할 수 있어요.') : ''}
     <section class="yl-card yl-setup" aria-label="대결 설정">
       <div class="yl-blk">
       <div class="yl-row">
@@ -426,6 +426,7 @@ function recordTab(h, sub) {
 // 단어 범위 창: 기말고사 · 중간고사, 단어장 번호, 친구 단어(각자 내 범위 · 같은 범위로). Closing it redraws the lobby.
 function openRangeSheet() {
   const cur = B, A = B.A, { codes, counts } = lobbyRanges();
+  if (!codes.length) { toast(noWordsYet(A) ? `${A.data.profile.class_name || ''} 새 단어 준비 중이에요. 단어가 올라오면 고를 수 있어요.` : '고를 수 있는 단어 범위가 없어요.'); return; } // V13.249
   const groups = periodGroups(A, codes), tabbed = !!groups[0].period;
   let period = tabbed ? (groups.find(group => group.codes.some(code => B.ranges.has(code))) || groups[0]).period : null;
   const total = () => [...B.ranges].reduce((n, c) => n + (counts.get(c) || 0), 0);
@@ -718,7 +719,7 @@ function monsterTab() {
   const cur = stageMonster(st.stage), boss = isBossStage(st.stage);
   const shown = B.monsterAll ? st.stage - 1 : Math.min(st.stage - 1, 5);
   const past = Array.from({ length: shown }, (_, i) => st.stage - 1 - i);
-  return `<section class="mh-hero ms-hero ms-region-hero" style="--rg:${cur.region.bg}" aria-label="몬스터 레벨">
+  return `${!w.codes.length && noWordsYet(A) ? wordsComingCard(A, '단어가 올라오면 몬스터와 싸울 수 있어요.') : ''}<section class="mh-hero ms-hero ms-region-hero" style="--rg:${cur.region.bg}" aria-label="몬스터 레벨">
       <div class="mh-hero-art" aria-hidden="true">${monsterPic(cur)}</div>
       <span class="ms-region-chip" aria-label="지역 ${esc(cur.region.name)}">${cur.region.icon} ${esc(cur.region.name)}<small>${cur.region.slot + 1}/${cur.region.size}</small></span>
       <h2>몬스터 레벨 <b class="ms-now">${num(st.stage)}</b></h2>

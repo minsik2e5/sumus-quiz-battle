@@ -3,7 +3,7 @@
 import { $, api, esc, toast, modal, buttonBusy } from './ui.js';
 
 const HOUR = 3600000, DAY = 24 * HOUR;
-const GRADES = { middle: ['중1', '중2', '중3'], high: ['고1', '고2', '고3'] };
+const GRADES = { middle: ['중1', '중2', '중3', '예비고1'], high: ['고1', '고2', '고3'] };
 export const multiplierText = m => `${m}배`;
 export const serverNow = A => Number(A?.data?.server_time || 0) ? Number(A.data.server_time) + (Date.now() - Number(A.loadedAt || Date.now())) : Date.now();
 // 3일 남음 · 끝나기 24시간 전부터는 5시간 남음 · 1시간 안이면 40분 남음

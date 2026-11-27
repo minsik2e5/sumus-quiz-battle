@@ -80,6 +80,15 @@ export function periodFolders(A, codes, { wrap, option, selected = [], count = (
     return `<details class="range-folder ${group.period}" data-period="${group.period}"${open ? ' open' : ''}><summary><b>${group.label}</b><small>${group.codes.length}개 범위 · ${words}단어</small></summary><div class="${wrap}">${group.codes.map(option).join('')}</div></details>`;
   }).join('')}</div>`;
 }
+// V13.249 학년 책이 하나도 없는 학생(원일중 예비고1, 새 단어가 오기 전): 화면이 깨지지 않게 "새 단어 준비 중" 안내를 보인다.
+// 새 단어는 grade: '예비고1' 책 하나를 더하면 바로 보인다(server/service.mjs allBooks, 학생 첫 화면은 b.grade === class_name).
+export const noWordsYet = A => A.data?.profile?.role === 'student' && !(A.data.books || []).some(book => (book.words || []).length);
+// 중등 교과서 어법 · 빈칸영작(중2 YBM · 중3 동아)도 예비고1에게는 안 보인다(중1~3 학생만).
+export const middleTextbookOff = A => A.data?.profile?.division === 'middle' && !/^중[1-3]/.test(String(A.data.profile.class_name || ''));
+export function wordsComingCard(A, more = '') {
+  const grade = A.data?.profile?.class_name || '';
+  return `<section class="words-coming-v13249" data-words-coming role="status"><span aria-hidden="true">📚</span><div><b>${esc(grade)} 새 단어 준비 중이에요</b><p>선생님이 곧 ${esc(grade)} 단어를 올려 주실 거예요. ${more || '그동안 펫 돌보기 · 출석 · 놀이터 코인 게임은 그대로 할 수 있어요.'}</p></div></section>`;
+}
 export function getRanges(A, school = A.school, grade = null) {
   const books = A.data.books.filter(book => !grade || !book.grade || book.grade === grade);
   const words = books.flatMap(book => book.words || []);
@@ -153,6 +162,7 @@ function todayWordQuest(A, goal = 20) {
 }
 export function rangePicker(A, teacher = false, grade = null) {
   const { words, codes, selected } = getRanges(A, A.school, grade);
+  if (!teacher && !codes.length && noWordsYet(A)) return wordsComingCard(A, '단어가 올라오면 여기에서 범위를 고를 수 있어요.'); // V13.249
   const option = c => {
     const state = !teacher ? wordQuestState(A, c) : null;
     const meta = !teacher ? wordQuestMeta(state) : null;
@@ -489,7 +499,7 @@ function home(A) {
   const p = A.data.profile;
   return `<div class="home-context home-context-v1327"><div><span>SUMUS VOCA</span><b>${esc(p.school || A.school || '학교 미설정')} · ${esc(p.class_name || '')}</b></div></div>
     ${rewardEventBanner(A)}${noticeBanner(A)}${legendBanner(A)}${pushPrompt(A)}
-    ${compactGrowth(A)}${schoolLeagueCard(A)}`;
+    ${noWordsYet(A) ? wordsComingCard(A) : ''}${compactGrowth(A)}${schoolLeagueCard(A)}`;
 }
 // V13.202 학교 대항전: 중2 · 중3 · 단원고 · 선부고 · 강서고가 이번 주 1인 평균 점수로 겨룬다(계산은 server/school-league.mjs).
 function schoolLeagueCard(A) {
@@ -594,6 +604,7 @@ function blankStudy(A) {
   const head = `<div class="study-subhead"><button class="study-back" data-blank-back="true">${icon('back')} ${A.blankGroup ? '본문 목록' : '학습'}</button><span class="pill">WRITING</span></div>`;
   const data = A.blankData;
   if (!data) return `${head}<section class="grammar-empty-school"><div><b>빈칸영작 자료를 불러오고 있어요.</b><p>잠시만 기다려주세요.</p></div></section>`;
+  if (middleTextbookOff(A)) return `${head}${wordsComingCard(A, '예비고1 빈칸영작 자료도 새 단어와 함께 준비할게요.')}`; // V13.249
   const done = A.data.rewards?.blank?.done || {}, rate = A.data.rewards?.blank?.rate || {};
   const sets = data.sets;
   const myGrade = /^(중[1-3])/.exec(String(A.data.profile.class_name || ''))?.[1] || '';
@@ -704,7 +715,7 @@ function grammarStudy(A) {
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill green">GRAMMAR</span></div>
   <div class="page-heading grammar-heading"><h1>어법·어휘</h1></div>
   <section class="study-school-card locked"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><span class="school-fixed">${icon('shield')} 선생님 관리</span></section>
-  ${middle ? (() => {
+  ${middle && middleTextbookOff(A) ? wordsComingCard(A, '예비고1 어법 자료도 새 단어와 함께 준비할게요.') : middle ? (() => {
     // 중2 학생은 YBM(박준언) 5 · 6 · 7과(기말고사 범위), 중3 학생은 동아(윤정미) 6 · 7과가 먼저 열리고, 다른 교과서 탭도 눌러 볼 수 있다.
     const sets = data.sets || [{ key: 'donga-yoon', grade: '중3', name: '동아(윤정미)', eyebrow: '중3 · 동아(윤정미)', lessons: [6, 7], byLesson }];
     const myGrade = /^(중[1-3])/.exec(String(A.data.profile.class_name || ''))?.[1] || '';
@@ -919,7 +930,7 @@ function memorizationPanel(A) {
   })();
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill green">VOCAB</span></div>
     <div class="page-heading memorize-heading premium-page-heading"><span class="premium-eyebrow">VOCABULARY</span><h1>단어 학습</h1></div>
-    <section class="setup-section"><div class="step-label"><span>01</span>범위 · 오늘 외울 단어</div>${rangeUi}${pickUi}</section>
+    <section class="setup-section"><div class="step-label"><span>01</span>범위 · 오늘 외울 단어</div>${noWordsYet(A) ? wordsComingCard(A, '단어가 올라오면 여기에서 범위를 골라 외울 수 있어요.') : rangeUi + pickUi}</section>
     <section class="memorize-shell">
       <div class="memorize-toolbar">
         <div class="segment compact"><button data-memorize-filter="all" class="${!starredOnly ? 'selected' : ''}">고른 단어 ${words.length}</button><button data-memorize-filter="starred" class="${starredOnly ? 'selected' : ''}">★ 어려운 단어 ${starredInScope.length}</button></div>
@@ -1115,8 +1126,9 @@ function ranking(A) {
   const periodTitle = period === 'week' ? (info.label || '이번 주') : '통합 누적';
   const periodRange = period === 'week' ? (info.range || '월요일 ~ 일요일') : '전체 학습 기록';
   const rankNo = item => Number(item[metric] || 0) > 0 ? items.findIndex(x => Number(x[metric] || 0) === Number(item[metric] || 0)) + 1 : '—';
-  // V13.247 단원고2(고2) 학생이 있으면 고2도 고른다.
-  const scopeOptions = [['all','전체'],['중2','중2'],['중3','중3'],['고1','고1'], ...(all.some(p => p.grade === '고2') || scope === '고2' ? [['고2','고2']] : [])];
+  // V13.247 단원고2(고2) 학생이 있으면 고2도, V13.249 원일중 예비고1 학생이 있으면 예비고1도 고른다.
+  const has = g => all.some(p => p.grade === g) || scope === g;
+  const scopeOptions = [['all','전체'],['중2','중2'],['중3','중3'], ...(has('예비고1') ? [['예비고1','예비고1']] : []),['고1','고1'], ...(has('고2') ? [['고2','고2']] : [])];
   const periodOptions = [['week','이번 주'],['all','통합']];
   const showPodium = items.length >= 3 && Number(items[2][metric] || 0) > 0;
   const rows = showPodium ? items.slice(3) : items;

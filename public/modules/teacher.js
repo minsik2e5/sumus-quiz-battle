@@ -353,7 +353,37 @@ export function studentFiltered(A) {
   }).join('')}</tbody></table></div><p class="st-count-v1375">${num(list.length)}명 표시 · 이름을 누르면 기록과 계정 관리가 열려요</p>`;
 }
 function students(A) {
-  return `<div class="toolbar st-toolbar-v1375"><div class="search">${icon('search')}<input id="student-search" aria-label="학생 검색" placeholder="이름 또는 아이디 검색" value="${esc(A.search || '')}"></div><select id="class-filter" aria-label="반 필터"><option value="">전체 반</option>${[...new Set(A.data.profiles.map(p => p.class_name))].map(c => `<option ${c === A.classFilter ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select><button type="button" class="btn secondary gift-btn-v1373" data-action="gift">${icon('gift')} 코인 선물</button></div><section class="panel st-panel-v1375" id="student-table">${studentFiltered(A)}</section>${signupCodePanel(A)}`;
+  return `<div class="toolbar st-toolbar-v1375"><div class="search">${icon('search')}<input id="student-search" aria-label="학생 검색" placeholder="이름 또는 아이디 검색" value="${esc(A.search || '')}"></div><select id="class-filter" aria-label="반 필터"><option value="">전체 반</option>${[...new Set(A.data.profiles.map(p => p.class_name))].map(c => `<option ${c === A.classFilter ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select><button type="button" class="btn secondary gift-btn-v1373" data-action="gift">${icon('gift')} 코인 선물</button></div><section class="panel st-panel-v1375" id="student-table">${studentFiltered(A)}</section>${classMovePanel(A)}${signupCodePanel(A)}`;
+}
+// V13.249 반 전체 학년 올리기: 지금 고른 학교의 한 반 학생을 모두 다른 반으로(예: 원일중 중3 → 예비고1, 기말 뒤 중2 → 중3).
+// 미리보기(GET /teacher/class-move)로 "중3 12명 → 예비고1"을 먼저 보고, 옮기기 버튼 → 한 번 더 확인 → POST.
+function classMovePanel(A) {
+  const classes = divisionClasses(A);
+  if (classes.length < 2) return '';
+  const form = A.classMove ||= { from: classes[classes.length - 2], to: classes[classes.length - 1] };
+  if (!classes.includes(form.from)) form.from = classes[classes.length - 2];
+  if (!classes.includes(form.to)) form.to = classes[classes.length - 1];
+  const counts = c => A.data.profiles.filter(p => p.class_name === c && !p.preview_owner_id).length;
+  const opt = sel => classes.map(c => `<option value="${esc(c)}" ${c === sel ? 'selected' : ''}>${esc(c)} (${num(counts(c))}명)</option>`).join('');
+  const v = A.classMovePreview && A.classMovePreview.from === form.from && A.classMovePreview.to === form.to && A.classMovePreview.school_id === A.data.profile.active_school_id ? A.classMovePreview : null;
+  const blocked = v && (!v.count || v.already || v.testing);
+  const box = !v ? '<p class="tiny muted">반을 고르고 <b>미리보기</b>를 누르면 옮길 학생 수와 이름이 먼저 나와요. 아직 아무것도 바뀌지 않아요.</p>'
+    : `<div class="class-move-preview" data-class-move-preview>
+      <div class="class-move-head"><b>${esc(v.school)} ${esc(v.from)} ${num(v.count)}명</b><span aria-hidden="true">→</span><b>${esc(v.to)}</b></div>
+      ${v.count ? `<p class="class-move-names">${v.names.map(esc).join(' · ')}${v.count > v.names.length ? ` 외 ${num(v.count - v.names.length)}명` : ''}</p>` : `<p class="class-move-warn">${esc(v.from)} 반에 옮길 학생이 없어요.</p>`}
+      <ul class="class-move-notes">
+        <li>펫 · 코인 · 경험치 · 레벨 · 연습 기록 · 단어 기록은 그대로예요. 학생은 다시 로그인하지 않아도 돼요.</li>
+        <li>단어 · 시험 범위는 ${esc(v.to)} 책으로 바뀌어요. ${esc(v.to)} 단어가 아직 없으면 학생 화면에 "새 단어 준비 중"이 나와요.</li>
+        ${v.exams.length || v.assignments.length ? `<li class="class-move-warn">${esc(v.from)} 대상 진행 중 ${v.exams.length ? `시험 ${num(v.exams.length)}개(${v.exams.map(e => esc(e.title)).join(', ')})` : ''}${v.exams.length && v.assignments.length ? ' · ' : ''}${v.assignments.length ? `과제 ${num(v.assignments.length)}개(${v.assignments.map(a => esc(a.title)).join(', ')})` : ''}는 옮길 때 <b>닫혀요</b>(기록은 남아요). 나중에 새로 ${esc(v.from)}이 된 학생에게 다시 보이지 않게 하려는 거예요.</li>` : ''}
+        ${v.already ? `<li class="class-move-warn">${esc(v.to)} 반에 이미 학생 ${num(v.already)}명이 있어 옮길 수 없어요. 두 반이 섞이지 않게 ${esc(v.to)} 반을 먼저 옮겨 주세요.</li>` : ''}
+        ${v.testing ? `<li class="class-move-warn">${esc(v.from)} 학생 ${num(v.testing)}명이 지금 시험을 보고 있어요. 시험이 끝난 뒤 옮겨 주세요.</li>` : ''}
+      </ul>
+      <button type="button" class="btn primary" data-class-move-go ${blocked ? 'disabled' : ''}>${esc(v.from)} ${num(v.count)}명을 ${esc(v.to)}(으)로 옮기기</button>
+    </div>`;
+  return `<section class="panel class-move-v13249" id="class-move"><div class="panel-head"><div><h2>반 전체 학년 올리기</h2><span>${esc(A.school || '')} 한 반 학생을 한꺼번에 다른 반으로 옮겨요 · 같은 학교 안에서만</span></div></div>
+    <div class="class-move-pick"><label class="field"><span>옮길 반</span><select id="class-move-from" aria-label="옮길 반">${opt(form.from)}</select></label><span class="class-move-arrow" aria-hidden="true">→</span><label class="field"><span>새 반</span><select id="class-move-to" aria-label="새 반">${opt(form.to)}</select></label><button type="button" class="btn secondary" data-class-move-preview-btn>미리보기</button></div>
+    ${box}
+  </section>`;
 }
 // V13.141 반별 가입 코드: 학생은 이 코드를 넣어야 가입할 수 있고, 코드가 학교·반을 정한다.
 // 꺼진 반이나 코드가 없는 반에는 가입이 안 된다. 새 코드를 만들면 옛 코드는 바로 못 쓴다.
@@ -404,7 +434,7 @@ const vocabLimit = A => A.vocabLimit || VOCAB_FIRST;
 export function moreVocab(A) { A.vocabLimit = vocabLimit(A) + VOCAB_STEP; }
 function books(A) {
   const middle = A.data.profile.active_division === 'middle';
-  const gradeSelect = middle ? `<label class="teacher-school"><span>학년</span><select id="vocab-grade"><option value="">전체</option><option value="중2" ${A.vocabGrade === '중2' ? 'selected' : ''}>중2</option><option value="중3" ${A.vocabGrade === '중3' ? 'selected' : ''}>중3</option></select></label>` : '';
+  const gradeSelect = middle ? `<label class="teacher-school"><span>학년</span><select id="vocab-grade"><option value="">전체</option>${divisionClasses(A).map(c => `<option value="${esc(c)}" ${A.vocabGrade === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>` : '';
   const importButton = middle ? `<button class="btn primary" data-action="vocab-import">${icon('plus')} 단어 파일 등록</button>` : '';
   return `<div class="toolbar books-toolbar-v1375"><span class="school-chip">${esc(A.school)}</span>${gradeSelect}<div class="search">${icon('search')}<input id="vocab-search" aria-label="단어 검색" placeholder="영어 또는 뜻 검색" value="${esc(A.vocabSearch || '')}"></div>${importButton}</div><section class="panel" id="vocab-table">${vocabTable(A)}</section>`;
 }

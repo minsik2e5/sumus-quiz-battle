@@ -623,6 +623,12 @@ document.addEventListener('change', async event => {
   try { const r = await api('/push/settings', { daily: daily.checked }); A.data.push = r.push; toast(daily.checked ? '저녁 7시 공부 알림을 켰어요.' : '저녁 공부 알림을 껐어요.'); }
   catch (err) { daily.checked = !daily.checked; toast(err.message); }
 });
+// V13.249 반 전체 학년 올리기: 반을 바꾸면 지난 미리보기는 지운다(새로 미리보기를 눌러야 옮기기 버튼이 나온다).
+document.addEventListener('change', event => {
+  if (!['class-move-from', 'class-move-to'].includes(event.target?.id)) return;
+  A.classMove = { from: $('#class-move-from').value, to: $('#class-move-to').value };
+  A.classMovePreview = null; renderKeepScroll();
+});
 navigator.serviceWorker?.addEventListener('message', event => {
   if (event.data?.type !== 'sumus-open') return;
   try { openGo(new URL(event.data.url).searchParams.get('go') || 'home'); } catch {}
@@ -908,6 +914,20 @@ $('#app').addEventListener('click', async event => {
     if (d.careAll !== undefined) { A.careAll = !A.careAll; renderKeepScroll(); return; }
     if (d.giftTo) return giftModal([d.giftTo]);
     if (d.action === 'gift-care') return giftModal(careIds(A, d.care));
+    // V13.249 반 전체 학년 올리기: 미리보기(GET) → 옮기기(한 번 더 확인) → POST.
+    if (d.classMovePreviewBtn !== undefined) {
+      A.classMove = { from: $('#class-move-from').value, to: $('#class-move-to').value };
+      buttonBusy(b);
+      try { A.classMovePreview = await api(`/teacher/class-move?from=${encodeURIComponent(A.classMove.from)}&to=${encodeURIComponent(A.classMove.to)}`); renderKeepScroll(); } catch (err) { toast(err.message); buttonBusy(b, false); }
+      return;
+    }
+    if (d.classMoveGo !== undefined) {
+      const v = A.classMovePreview;
+      if (!v || !confirm(`${v.school} ${v.from} 학생 ${v.count}명을 모두 ${v.to}(으)로 옮길까요?${v.exams.length || v.assignments.length ? `\n${v.from} 대상 진행 중 시험 ${v.exams.length}개 · 과제 ${v.assignments.length}개는 닫혀요.` : ''}\n펫 · 코인 · 경험치 · 기록은 그대로예요.`)) return;
+      buttonBusy(b);
+      try { const r = await api('/teacher/class-move', { from: v.from, to: v.to, count: v.count }); A.classMovePreview = null; await refresh(); renderKeepScroll(); toast(`${r.from} ${r.moved}명을 ${r.to}(으)로 옮겼어요.`); } catch (err) { toast(err.message); buttonBusy(b, false); }
+      return;
+    }
     // V13.141 반별 가입 코드(새 코드 만들기·켜기/끄기)와 새로 가입한 학생 이름·반 고치기.
     if (d.signupCodeNew || d.signupCodeToggle) {
       const [school_id, class_name] = (d.signupCodeNew || d.signupCodeToggle).split('|');
@@ -1421,8 +1441,8 @@ function parseVocabFile(name, text) {
 function vocabImportModal() {
   if (A.data.profile.active_division !== 'middle') return toast('중등부에서 사용할 수 있어요.');
   let rows = [], preview = null;
-  const close = modal(`<h2>중등 단어 파일 등록</h2><p>${esc(A.school)} 중2·중3 단어를 CSV 또는 JSON으로 등록합니다.</p>
-    <div class="sumus-detail-section"><div class="form-columns"><label class="field"><span>학년</span><select id="vocab-import-grade"><option value="중2" ${A.vocabGrade === '중2' ? 'selected' : ''}>중2</option><option value="중3" ${A.vocabGrade === '중3' ? 'selected' : ''}>중3</option></select></label><label class="field"><span>파일</span><input id="vocab-import-file" type="file" accept=".csv,.json,text/csv,application/json"></label></div><p class="sumus-account-note">CSV 열: <b>범위, 영어, 뜻</b> 또는 <b>range, word, meaning</b>. 등록하면 같은 학교·같은 학년의 이전 업로드 단어를 교체합니다.</p></div>
+  const close = modal(`<h2>중등 단어 파일 등록</h2><p>${esc(A.school)} ${esc(activeClassOptions().join('·'))} 단어를 CSV 또는 JSON으로 등록합니다.</p>
+    <div class="sumus-detail-section"><div class="form-columns"><label class="field"><span>학년</span><select id="vocab-import-grade">${activeClassOptions().map(c => `<option value="${esc(c)}" ${A.vocabGrade === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label><label class="field"><span>파일</span><input id="vocab-import-file" type="file" accept=".csv,.json,text/csv,application/json"></label></div><p class="sumus-account-note">CSV 열: <b>범위, 영어, 뜻</b> 또는 <b>range, word, meaning</b>. 등록하면 같은 학교·같은 학년의 이전 업로드 단어를 교체합니다.</p></div>
     <div id="vocab-import-preview" class="vocab-import-preview"><p class="tiny muted">파일을 선택하면 등록 전 미리보기가 나옵니다.</p></div>
     <div id="vocab-import-error" class="form-error"></div>
     <button class="btn primary full" id="vocab-import-save" disabled>검수 후 등록하기</button>`, '단어 DB 등록');
@@ -1732,9 +1752,9 @@ function openTournamentTv(id) {
   openBracketTv(A, id, async () => { A.screen = null; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); });
 }
 // V13.66 teacher: open an academy tournament for one grade (or class).
-// V13.247 대상: 중2 · 중3, 고1 전체 · 고1A · 고1B, 단원고2는 고2(school-classes.js gradeTargets).
+// V13.247 대상: 중2 · 중3(V13.249 원일중은 예비고1도), 고1 전체 · 고1A · 고1B, 단원고2는 고2(school-classes.js gradeTargets).
 const tournamentTargets = school => gradeTargets(school);
-const gradeOfClass = value => String(value || '').match(/^(중[1-3]|고[1-3])/)?.[1] || String(value || '');
+const gradeOfClass = value => String(value || '').match(/^(예비고1|중[1-3]|고[1-3])/)?.[1] || String(value || ''); // V13.249 예비고1도 한 학년
 function tournamentCreateModal() {
   const middle = A.data.profile.active_division === 'middle';
   const targets = tournamentTargets(activeSchoolRef());

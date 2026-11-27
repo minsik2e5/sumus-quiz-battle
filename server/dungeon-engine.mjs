@@ -96,7 +96,7 @@ export const FLOORS = [
 ];
 
 // 학년(·범위 난이도)에 따라 조금 더 주는 시간. 파티는 같은 학년이라 파티 안에서는 같다.
-export const GRADE_EXTRA_MS = { 중1: 1000, 중2: 800, 중3: 600, 고1: 400, 고2: 200, 고3: 0 };
+export const GRADE_EXTRA_MS = { 중1: 1000, 중2: 800, 중3: 600, 예비고1: 400, 고1: 400, 고2: 200, 고3: 0 }; // V13.249 예비고1은 고1과 같은 시간
 export const EXTRA_MAX_MS = 1500;
 
 // 일반 몬스터 풀(CODEX_PROMPT_22.md 표). 크기 S·M·L은 앱이 그리는 배율이고, 엔진에서는

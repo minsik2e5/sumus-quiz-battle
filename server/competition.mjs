@@ -6,6 +6,7 @@ import { TITLES, TITLE_KEYS, titleUnlocked, LEAGUE_POINTS, LEAGUE_PAIR_DAY_CAP, 
 import { GACHA_ITEMS, GACHA_KEYS } from '../public/modules/rewards.js';
 import { bonusRecords, epicCount } from './rewards.mjs';
 import { guardDayNums } from '../public/modules/streak-guard.js';
+import { gradeOfClass, GRADE_BAND } from '../public/modules/school-classes.js';
 import { dungeonTitleStats, dungeonKings } from './dungeon-records.mjs';
 import { clawTitleStats } from './claw.mjs';
 import { rankTitleStats } from './arena-rank.mjs';
@@ -39,18 +40,19 @@ export function rankingWeek(now = Date.now()) {
     range: `${shortKstDate(start)} ~ ${shortKstDate(end - 1)}`
   };
 }
-export const gradeOf = className => String(className || '').match(/^(중[1-3]|고[1-3])/)?.[1] || String(className || '');
+// V13.249 예비고1은 자기 학년(중3 · 고1과 섞이지 않는다, public/modules/school-classes.js GRADE_HEAD).
+export const gradeOf = gradeOfClass;
 // V13.125: the same 부 (중학교/고등학교) and the same 학년 (고1A and 고1B are both 고1), whichever
 // school. a and b are { division, class_name }. 야차전 across schools uses it, and the dungeon lobby
 // (docs/dungeon-design.md: 학교가 달라도 같은 학년이면 된다) is meant to use the same rule.
 export const sameGradeBand = (a, b) => {
   const grade = gradeOf(a?.class_name);
-  return !!a?.division && a.division === b?.division && /^(중|고)[1-3]$/.test(grade) && grade === gradeOf(b?.class_name);
+  return !!a?.division && a.division === b?.division && GRADE_BAND.test(grade) && grade === gradeOf(b?.class_name);
 };
 // The grade group of the ranking tab. V13.247 단원고 고2 반은 '고2'(고1과 따로).
 export function rankGrade(profile) {
   const c = profile?.class_name || '';
-  return /^중2/.test(c) ? '중2' : /^중3/.test(c) ? '중3' : /^고1/.test(c) ? '고1' : /^고2/.test(c) ? '고2' : (profile?.division === 'middle' ? '중등' : '고등');
+  return /^중2/.test(c) ? '중2' : /^중3/.test(c) ? '중3' : /^예비고1/.test(c) ? '예비고1' : /^고1/.test(c) ? '고1' : /^고2/.test(c) ? '고2' : (profile?.division === 'middle' ? '중등' : '고등');
 }
 const push = (map, key, value) => { if (!map.has(key)) map.set(key, []); map.get(key).push(value); };
 // KST calendar day and Monday-based week as plain numbers (KST has no daylight saving), so

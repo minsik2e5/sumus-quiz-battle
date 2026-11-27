@@ -6,11 +6,12 @@
 //   랭킹(같은 학교 · 같은 학년)은 GET에서만 만들고 1분 캐시한다. 쓰기 요청 안에서는 다른 학생을 훑지 않는다.
 import { RANK, tierOf, tierIndex, seasonOf, softReset, rpDelta, rpRatio, seasonCoins } from '../public/modules/arena-rank-rules.js';
 import { addBonus } from './rewards.mjs';
+import { GRADE_BAND, gradeOfClass } from '../public/modules/school-classes.js';
 
 const n0 = v => Math.max(0, Math.round(Number(v) || 0));
-const GRADE = /^(중|고)[1-3]$/;
-// server/competition.mjs gradeOf와 같다(서로 불러오는 고리를 만들지 않으려고 여기 둔다).
-const gradeOf = c => String(c || '').match(/^(중[1-3]|고[1-3])/)?.[1] || String(c || '');
+// server/competition.mjs gradeOf와 같다(V13.249 예비고1도 한 학년, public/modules/school-classes.js).
+const GRADE = GRADE_BAND;
+const gradeOf = gradeOfClass;
 
 // 시즌을 넘긴 모습(복사본). 원본은 바꾸지 않는다. 지난 시즌마다 한 티어씩 내려가고(최대 3번), 판을 했던 시즌만 기록에 남긴다.
 export function rolledRank(r, now = Date.now()) {
